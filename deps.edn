@@ -4,6 +4,9 @@
  {org.clojure/clojure               {:mvn/version "1.10.1"}
   org.java-websocket/Java-WebSocket {:mvn/version "1.5.1"}
   org.clojure/tools.cli             {:mvn/version "1.0.194"}
+  io.pedestal/pedestal.log          {:mvn/version "0.5.2"
+                                     :exludes [org.slf4j/slf4j-nop]}
+  org.slf4j/slf4j-jdk14             {:mvn/version "1.7.30"}
   com.cognitect/transit-clj         {:mvn/version "1.0.324"
                                      :excludes    [org.msgpack/msgpack]}}
 
@@ -24,5 +27,6 @@
    :extra-deps
    {clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
-     :sha     "7708e7fd4572459c81f6a6b8e44c96f41cdd92d4"}}}
+     :sha     "7708e7fd4572459c81f6a6b8e44c96f41cdd92d4"
+     :excludes [org.slf4j/slf4j-nop]}}}
   }}

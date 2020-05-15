@@ -1,8 +1,9 @@
 (ns lambdaisland.funnel
   (:gen-class)
-  (:require [cognitect.transit :as transit]
+  (:require [clojure.java.io :as io]
             [clojure.tools.cli :as cli]
-            [clojure.java.io :as io])
+            [cognitect.transit :as transit]
+            [io.pedestal.log :as log])
   (:import (com.cognitect.transit DefaultReadHandler
                                   WriteHandler)
            (java.io ByteArrayInputStream
@@ -52,6 +53,10 @@
     (stringRep [_ _])
     (getVerboseHandler [_])))
 
+(defn maybe-error [e]
+  (when (and (vector? e) (= ::error (first e)))
+    (second e)))
+
 (defn to-transit [value]
   (try
     (let [out (ByteArrayOutputStream. 4096)
@@ -69,19 +74,17 @@
     (catch Exception e
       [::error e])))
 
-(defn maybe-error [e]
-  (when (and (vector? e) (= ::error (first e)))
-    (second e)))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; WS Server
 
 (defn websocket-server
   ^WebSocketServer
   [{:keys [event-handler host port decoder-count]
     :or   {decoder-count (.. Runtime getRuntime availableProcessors)}}]
   (proxy [WebSocketServer] [^InetSocketAddress
-                            (doto (if host
-                                    (InetSocketAddress. ^String host ^long port)
-                                    (InetSocketAddress. port)) prn)
+                            (if host
+                              (InetSocketAddress. ^String host ^long port)
+                              (InetSocketAddress. port))
                             ^Integer
                             decoder-count]
     (onOpen [^WebSocket conn ^ClientHandshake handshake]
@@ -123,10 +126,37 @@
     (doto (SSLContext/getInstance "TLS")
       (.init (.getKeyManagers key-manager) nil nil))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CLI
+
+(defn init-logging [level]
+  (let [root  (java.util.logging.Logger/getLogger "")
+        level (case (long  level)
+                0 java.util.logging.Level/WARNING
+                1 java.util.logging.Level/INFO
+                2 java.util.logging.Level/FINE
+                java.util.logging.Level/FINEST)]
+    (prn level)
+    (run! #(.removeHandler root %) (.getHandlers root))
+    (.setLevel root level)
+    (.addHandler root
+                 (doto (java.util.logging.ConsoleHandler.)
+                   (.setLevel level)
+                   (.setFormatter
+                    (proxy [java.util.logging.Formatter] []
+                      (format [^java.util.logging.LogRecord record]
+                        (str (.getLevel record) " ["
+                             (.getLoggerName record) "] "
+                             (.getMessage record)
+                             "\n"))))))))
+
 (def option-specs
   [[nil "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL"]
    [nil "--keystore-password PASSWORD" "Password to load the keystore, defaults to \"funnel\" "
     :default "funnel"]
+   ["-v" "--verbose" "Increase verbosity, -vvv is the maximum."
+    :default 0
+    :update-fn inc]
    ["-h" "--help" "Output this help information."]])
 
 (defn print-help [summary]
@@ -136,6 +166,7 @@
 
 (defn -main [& args]
   (let [{:keys [options arguments summary]} (cli/parse-opts args option-specs)]
+    (init-logging (:verbose options))
     (if (:help options)
       (print-help summary)
       (let [ws-server (websocket-server {:port ws-port
@@ -150,12 +181,13 @@
                 (cond-> {:ws-server ws-server}
                   wss-server
                   (assoc :wss-server wss-server)))
-        (prn "starting")
+        (log/info :starting-ws-server {:port ws-port})
         (.start ws-server)
-        (prn "started")
-        (when wss-server
-          (prn "starting2")
-          (.start wss-server)
-          (prn "started2"))))))
+        (log/info :starting-wss-server {:port wss-port})
+        (.start wss-server)))))
 
 ;;socket = new WebSocket("wss://localhost:44221")
+(comment
+
+  (init-logging 3)
+  )

@@ -3,8 +3,9 @@
  :deps
  {org.clojure/clojure               {:mvn/version "1.10.1"}
   org.java-websocket/Java-WebSocket {:mvn/version "1.5.1"}
+  org.clojure/tools.cli             {:mvn/version "1.0.194"}
   com.cognitect/transit-clj         {:mvn/version "1.0.324"
-                                     :excludes [org.msgpack/msgpack]}}
+                                     :excludes    [org.msgpack/msgpack]}}
 
  :aliases
  {:test
@@ -14,11 +15,14 @@
   :native-image
   {:main-opts ["-m clj.native-image lambdaisland.funnel"
                "--initialize-at-build-time"
+               "--no-fallback"
+               "--enable-https"
                "-H:Name=funnel"
-               "--no-fallback"]
-   :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
+               "-H:Log=registerResource"
+               "-H:ResourceConfigurationFiles=resource-config.json"]
+   :jvm-opts  ["-Dclojure.compiler.direct-linking=true"]
    :extra-deps
    {clj.native-image
     {:git/url "https://github.com/taylorwood/clj.native-image.git"
-     :sha "7708e7fd4572459c81f6a6b8e44c96f41cdd92d4"}}}
+     :sha     "7708e7fd4572459c81f6a6b8e44c96f41cdd92d4"}}}
   }}

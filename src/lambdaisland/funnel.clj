@@ -1,12 +1,18 @@
 (ns lambdaisland.funnel
   (:gen-class)
-  (:require [cognitect.transit :as transit])
+  (:require [cognitect.transit :as transit]
+            [clojure.tools.cli :as cli]
+            [clojure.java.io :as io])
   (:import (com.cognitect.transit DefaultReadHandler
                                   WriteHandler)
            (java.io ByteArrayInputStream
-                    ByteArrayOutputStream)
+                    ByteArrayOutputStream
+                    FileInputStream)
            (java.net InetSocketAddress)
            (java.nio ByteBuffer)
+           (java.security KeyStore)
+           (javax.net.ssl SSLContext
+                          KeyManagerFactory)
            (org.java_websocket WebSocket
                                WebSocketAdapter)
            (org.java_websocket.drafts Draft_6455)
@@ -23,6 +29,8 @@
 
 (def ws-port  44220)
 (def wss-port 44221)
+
+(def state (atom {}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Transit
@@ -65,16 +73,15 @@
   (when (and (vector? e) (= ::error (first e)))
     (second e)))
 
-(def ws-factory (DefaultWebSocketServerFactory.))
 
 (defn websocket-server
   ^WebSocketServer
   [{:keys [event-handler host port decoder-count]
     :or   {decoder-count (.. Runtime getRuntime availableProcessors)}}]
   (proxy [WebSocketServer] [^InetSocketAddress
-                            (if host
-                              (InetSocketAddress. ^String host ^long port)
-                              (InetSocketAddress. port))
+                            (doto (if host
+                                    (InetSocketAddress. ^String host ^long port)
+                                    (InetSocketAddress. port)) prn)
                             ^Integer
                             decoder-count]
     (onOpen [^WebSocket conn ^ClientHandshake handshake]
@@ -103,7 +110,52 @@
       (event-handler
        {:event :ws/start}))))
 
+(defn ssl-context [keystore password]
+  (let [key-manager (KeyManagerFactory/getInstance (KeyManagerFactory/getDefaultAlgorithm))
+        key-store (KeyStore/getInstance (KeyStore/getDefaultType))
+        pw (.toCharArray ^String password)]
+
+    (with-open [fs (io/input-stream keystore)]
+      (.load key-store fs pw))
+
+    (.init key-manager key-store pw)
+
+    (doto (SSLContext/getInstance "TLS")
+      (.init (.getKeyManagers key-manager) nil nil))))
+
+(def option-specs
+  [[nil "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL"]
+   [nil "--keystore-password PASSWORD" "Password to load the keystore, defaults to \"funnel\" "
+    :default "funnel"]
+   ["-h" "--help" "Output this help information."]])
+
+(defn print-help [summary]
+  (println "Usage: funnel [OPTS]")
+  (println)
+  (println summary))
+
 (defn -main [& args]
-  (.start (websocket-server {:port ws-port
-                             :event-handler prn}))
-  )
+  (let [{:keys [options arguments summary]} (cli/parse-opts args option-specs)]
+    (if (:help options)
+      (print-help summary)
+      (let [ws-server (websocket-server {:port ws-port
+                                         :event-handler prn})
+            wss-server (doto (websocket-server {:port wss-port
+                                                :event-handler prn})
+                         (.setWebSocketFactory
+                          (DefaultSSLWebSocketServerFactory.
+                           (ssl-context (:keystore options (io/resource "keystore.jks"))
+                                        (:keystore-password options)))))]
+        (reset! state
+                (cond-> {:ws-server ws-server}
+                  wss-server
+                  (assoc :wss-server wss-server)))
+        (prn "starting")
+        (.start ws-server)
+        (prn "started")
+        (when wss-server
+          (prn "starting2")
+          (.start wss-server)
+          (prn "started2"))))))
+
+;;socket = new WebSocket("wss://localhost:44221")

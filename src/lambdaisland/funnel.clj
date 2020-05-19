@@ -163,27 +163,32 @@
   (println)
   (println summary))
 
+(defn start! [options]
+  (let [ws-server (websocket-server {:port ws-port
+                                     :event-handler #(log/info :evt %)})
+        wss-server (doto (websocket-server {:port wss-port
+                                            :event-handler #(log/info :evt %)})
+                     (.setWebSocketFactory
+                      (DefaultSSLWebSocketServerFactory.
+                       (ssl-context (:keystore options (io/resource "keystore.jks"))
+                                    (:keystore-password options)))))]
+    (reset! state
+            (cond-> {:ws-server ws-server}
+              wss-server
+              (assoc :wss-server wss-server)))
+    (log/info :starting-ws-server {:port ws-port})
+    (.start ws-server)
+    (log/info :starting-wss-server {:port wss-port})
+    (.start wss-server)
+    {:ws-server ws-server
+     :wss-server wss-server}))
+
 (defn -main [& args]
   (let [{:keys [options arguments summary]} (cli/parse-opts args option-specs)]
     (init-logging (:verbose options))
     (if (:help options)
       (print-help summary)
-      (let [ws-server (websocket-server {:port ws-port
-                                         :event-handler #(log/info :evt %)})
-            wss-server (doto (websocket-server {:port wss-port
-                                                :event-handler #(log/info :evt %)})
-                         (.setWebSocketFactory
-                          (DefaultSSLWebSocketServerFactory.
-                           (ssl-context (:keystore options (io/resource "keystore.jks"))
-                                        (:keystore-password options)))))]
-        (reset! state
-                (cond-> {:ws-server ws-server}
-                  wss-server
-                  (assoc :wss-server wss-server)))
-        (log/info :starting-ws-server {:port ws-port})
-        (.start ws-server)
-        (log/info :starting-wss-server {:port wss-port})
-        (.start wss-server)))))
+      (start! options))))
 
 ;;socket = new WebSocket("wss://localhost:44221")
 (comment

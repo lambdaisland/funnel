@@ -19,12 +19,13 @@
                "--initialize-at-build-time"
                "--no-fallback"
                "--enable-https"
+               "--allow-incomplete-classpath"
                "-H:Name=funnel"
                "-H:Log=registerResource"
                "-H:ResourceConfigurationFiles=resource-config.json"]
    :jvm-opts  ["-Dclojure.compiler.direct-linking=true"]
    :extra-deps
    {clj.native-image             {:git/url "https://github.com/taylorwood/clj.native-image.git"
-                                  :sha     "7708e7fd4572459c81f6a6b8e44c96f41cdd92d4"}
+                                  :sha     "602587dfb5243ea8c72ed3e967c37c1f9d611723"}
     org.clojure/tools.deps.alpha {:mvn/version "0.7.516"
                                   :exclusions [org.slf4j/slf4j-nop]}}}}}

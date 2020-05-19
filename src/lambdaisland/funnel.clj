@@ -136,7 +136,6 @@
                 1 java.util.logging.Level/INFO
                 2 java.util.logging.Level/FINE
                 java.util.logging.Level/FINEST)]
-    (prn level)
     (run! #(.removeHandler root %) (.getHandlers root))
     (.setLevel root level)
     (.addHandler root
@@ -170,9 +169,9 @@
     (if (:help options)
       (print-help summary)
       (let [ws-server (websocket-server {:port ws-port
-                                         :event-handler prn})
+                                         :event-handler #(log/info :evt %)})
             wss-server (doto (websocket-server {:port wss-port
-                                                :event-handler prn})
+                                                :event-handler #(log/info :evt %)})
                          (.setWebSocketFactory
                           (DefaultSSLWebSocketServerFactory.
                            (ssl-context (:keystore options (io/resource "keystore.jks"))

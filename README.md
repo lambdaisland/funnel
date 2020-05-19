@@ -97,7 +97,7 @@ selector used in `:funnel/subscribe`.
 ### `:funnel/broadcast`
 
 Clients can send arbitrary messages to funnel without caring where they go. If
-there is a matching subscription then they willg et forwarded, if not they are
+there is a matching subscription then they will get forwarded, if not they are
 dropped. But a client may also choose to address a message to a specific client
 or subset of clients, by using `:funnel/broadcast`. The value of
 `:funnel/broadcast` is again a _selector_, as with `:funnel/subscribe`.
@@ -135,7 +135,7 @@ When a message is received we try to decode it as transit. If the decoded value
 is a map then we look for the above keys and handle `:funnel/whoami`,
 `:funnel/subscribe`, `:funnel/unsubscribe`, and `:funnel/query`.
 
-The we determine the recipients of the message, based on existing subscriptions,
+Then we determine the recipients of the message, based on existing subscriptions,
 and if present on the value of `:funnel/broadcast`.
 
 Note that messages don't have to be maps, or even valid transit. In that case

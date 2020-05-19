@@ -1,4 +1,5 @@
 #kaocha/v1
 {:plugins [:kaocha.plugin/notifier
            :kaocha.plugin/print-invocations
-           :kaocha.plugin/profiling]}
+           :kaocha.plugin/profiling]
+ :kaocha.plugin.capture-output/capture-output? false}

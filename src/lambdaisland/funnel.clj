@@ -151,8 +151,7 @@
 
 (def option-specs
   [[nil "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL"]
-   [nil "--keystore-password PASSWORD" "Password to load the keystore, defaults to \"funnel\" "
-    :default "funnel"]
+   [nil "--keystore-password PASSWORD" "Password to load the keystore, defaults to \"funnel\" "]
    ["-v" "--verbose" "Increase verbosity, -vvv is the maximum."
     :default 0
     :update-fn inc]
@@ -164,14 +163,16 @@
   (println summary))
 
 (defn start! [options]
-  (let [ws-server (websocket-server {:port ws-port
+  (let [ws-port (:ws-port options ws-port)
+        wss-port (:wss-port options wss-port)
+        ws-server (websocket-server {:port ws-port
                                      :event-handler #(log/info :evt %)})
         wss-server (doto (websocket-server {:port wss-port
                                             :event-handler #(log/info :evt %)})
                      (.setWebSocketFactory
                       (DefaultSSLWebSocketServerFactory.
                        (ssl-context (:keystore options (io/resource "keystore.jks"))
-                                    (:keystore-password options)))))]
+                                    (:keystore-password options "funnel")))))]
     (reset! state
             (cond-> {:ws-server ws-server}
               wss-server
@@ -182,6 +183,10 @@
     (.start wss-server)
     {:ws-server ws-server
      :wss-server wss-server}))
+
+(defn stop! [{:keys [ws-server wss-server]}]
+  (.stop ^WebSocketServer ws-server)
+  (.stop ^WebSocketServer wss-server))
 
 (defn -main [& args]
   (let [{:keys [options arguments summary]} (cli/parse-opts args option-specs)]

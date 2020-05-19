@@ -31,3 +31,8 @@
 {:funnel/whoami {:id "kaocha-cljs-abcd"
                  :type :kaocha.cljs2/test-run}
  :funnel/subscribe {:type #{:kaocha.cljs2/js-runtime}}}
+
+{:funnel/broadcast {:id "firefox-123"}}
+
+{:funnel/subscribe [:id "firefox-123"]}
+{:funnel/subscribe [:type :kaocha.cljs2/js-runtime]}

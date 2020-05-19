@@ -164,6 +164,10 @@ Subscribers are *not* notified of new connections per-se, instead when a client
 announces itself with a `:funnel/whoami` then that first message will be
 forwarded to matching subscribers (like any other message).
 
+## Prior Art
+
+The design of Funnel is influenced by shadow-cljs's `shadow.remote`.
+
 ## License
 
 Copyright &copy; 2020 Arne Brasseur and Contributors

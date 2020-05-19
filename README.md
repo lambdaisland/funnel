@@ -8,11 +8,17 @@ Transit-over-WebSocket Message Relay
 
 ## What is it?
 
-Funnel is a WebSocket server. It accepts connections from multiple clients, and
+Funnel is a WebSocket relay. It accepts connections from multiple clients, and
 then acts as a go-between, funneling messages between them. Messages can be
 addressed at a specific client, or broadcasted to a selection of clients.
 
 ## What is it for?
+
+Funnel grew out of the need to persist connections with JavaScript runtimes.
+When tooling (a REPL, a test runner, a remote object browser) needs a connection
+to a JavaScript runtime (say, a browser tab), then it has to wait for the
+browser tab to connect back. There is no way to query for existing runtimes and
+connect to them, we can only spawn a new one, and wait for it to call back.
 
 Funnel forms a bridge between developer tooling and JavaScript runtimes. It
 keeps persistent connections to runtimes so individual tools don't have to. This

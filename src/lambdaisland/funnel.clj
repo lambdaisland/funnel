@@ -1,6 +1,8 @@
 (ns lambdaisland.funnel
   (:gen-class)
-  (:require [clojure.java.io :as io]
+  (:require [clojure.core.async :as async]
+            [clojure.java.io :as io]
+            [clojure.pprint :as pprint]
             [clojure.tools.cli :as cli]
             [cognitect.transit :as transit]
             [io.pedestal.log :as log])
@@ -15,7 +17,8 @@
            (javax.net.ssl SSLContext
                           KeyManagerFactory)
            (org.java_websocket WebSocket
-                               WebSocketAdapter)
+                               WebSocketAdapter
+                               WebSocketImpl)
            (org.java_websocket.drafts Draft_6455)
            (org.java_websocket.handshake Handshakedata)
            (org.java_websocket.handshake ClientHandshake)
@@ -30,8 +33,6 @@
 
 (def ws-port  44220)
 (def wss-port 44221)
-
-(def state (atom {}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Transit
@@ -74,44 +75,95 @@
     (catch Exception e
       [::error e])))
 
+(defn handle-message [state conn raw-msg]
+  (let [msg (from-transit raw-msg)]
+    (log/trace :message msg)
+    (when (map? msg)
+      (when-let [whoami (:funnel/whoami msg)]
+        (swap! state assoc-in [conn :whoami] whoami))
+      (when-let [selector (:funnel/subscribe msg)]
+        (swap! state update-in [conn :subscriptions] (fnil conj #{}) selector))
+      (when-let [selector (:funnel/unsubscribe msg)]
+        (swap! state update-in [conn :subscriptions] (fnil disj #{}) selector))
+      )
+
+    )
+  )
+
+(defn handle-open [state conn handshake]
+  (let [inbox (async/chan)
+        outbox (async/chan)]))
+
+(defn handle-close [state conn code reason remote?]
+  (swap! state dissoc conn))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WS Server
 
 (defn websocket-server
+  "Create an instance of WebSocketServer, without starting it. Implements
+  Closeable so it can be used it [[with-open]], implements IDeref to make it
+  easy to block until the server has fully booted up."
   ^WebSocketServer
-  [{:keys [event-handler host port decoder-count]
-    :or   {decoder-count (.. Runtime getRuntime availableProcessors)}}]
-  (proxy [WebSocketServer] [^InetSocketAddress
-                            (if host
-                              (InetSocketAddress. ^String host ^long port)
-                              (InetSocketAddress. port))
-                            ^Integer
-                            decoder-count]
-    (onOpen [^WebSocket conn ^ClientHandshake handshake]
-      (event-handler
-       {:event        :ws/open
-        :ws/conn      conn
-        :ws/handshake handshake}))
-    (onClose [^WebSocket conn code ^String reason remote?]
-      (event-handler
-       {:event   :ws/close
-        :ws/conn conn
-        :code    code
-        :reason  reason
-        :remote? remote?}))
-    (onMessage [^WebSocket conn ^String message]
-      (event-handler
-       {:event   :ws/message
-        :ws/conn conn
-        :message (from-transit message)}))
-    (onError [^WebSocket conn ^Exception ex]
-      (event-handler
-       {:event     :ws/error
-        :ws/conn   conn
-        :exception ex}))
-    (onStart []
-      (event-handler
-       {:event :ws/start}))))
+  [{:keys [state host port decoder-count]
+    :or   {decoder-count (.. Runtime getRuntime availableProcessors)}
+    :as   opts}]
+  (let [started? (promise)
+        server (proxy [WebSocketServer java.io.Closeable clojure.lang.IDeref clojure.lang.IMeta]
+                   [^InetSocketAddress
+                    (if host
+                      (InetSocketAddress. ^String host ^long port)
+                      (InetSocketAddress. port))
+                    ^Integer
+                    decoder-count]
+                 (onOpen [^WebSocket conn ^ClientHandshake handshake]
+                   (log/trace :ws-socket/open {:conn conn :handshake handshake})
+                   (handle-open state conn handshake))
+                 (onClose [^WebSocket conn code ^String reason remote?]
+                   (log/trace :ws-socket/close {:conn conn :code code :reason reason :remote? remote?})
+                   (handle-close state conn code reason remote?))
+                 (onMessage [^WebSocket conn ^String message]
+                   (try
+                     (handle-message state conn message)
+                     (catch Exception e
+                       (log/error :handle-message-error {:message message} :exception e))))
+                 (onError [^WebSocket conn ^Exception ex]
+                   (log/error :ws-server/error opts :exception ex)
+                   (when-not (realized? started?)
+                     (deliver started? ex)))
+                 (onStart []
+                   (deliver started? this))
+                 (close []
+                   (try
+                     (log/info :stopping-server this)
+                     (.stop ^WebSocketServer this)
+                     (catch Exception e
+                       (log/error :error-while-stopping-server this :exception e))))
+                 (deref []
+                   @started?)
+                 (meta []
+                   {:type ::server})
+                 (toString []
+                   (pr-str
+                    {:type ::server
+                     :opts opts
+                     :started? (realized? started?)})))]
+    (.addMethod ^clojure.lang.MultiFn pprint/simple-dispatch (class server) (fn [s] (print s)))
+    server))
+
+(defmethod print-method ::server [v ^java.io.Writer w]
+  (.write w (.toString ^Object v)))
+
+(defmethod print-method WebSocketImpl [^WebSocketImpl s ^java.io.Writer w]
+  (.write w "#org.java_websocket.WebSocket ")
+  (.write w (pr-str {:open? (.isOpen s)
+                     :closing? (.isClosing s)
+                     :flush-and-close? (.isFlushAndClose s)
+                     :closed? (.isClosed s)
+                     :selection-key (.getSelectionKey s)
+                     :remote-socket-address (.getRemoteSocketAddress s)
+                     :local-socket-address (.getLocalSocketAddress s)
+                     :resource-descriptor (.getResourceDescriptor s)})))
 
 (defn ssl-context [keystore password]
   (let [key-manager (KeyManagerFactory/getInstance (KeyManagerFactory/getDefaultAlgorithm))
@@ -144,10 +196,17 @@
                    (.setFormatter
                     (proxy [java.util.logging.Formatter] []
                       (format [^java.util.logging.LogRecord record]
-                        (str (.getLevel record) " ["
-                             (.getLoggerName record) "] "
-                             (.getMessage record)
-                             "\n"))))))))
+                        (let [ex (.getThrown record)
+                              sym (gensym "ex")]
+                          (when ex
+                            (intern 'user sym ex))
+                          (str (.getLevel record) " ["
+                               (.getLoggerName record) "] "
+                               (.getMessage record)
+                               (if ex
+                                 (str " => " (.getName (class ex)) " user/" sym)
+                                 "")
+                               "\n")))))))))
 
 (def option-specs
   [[nil "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL"]
@@ -162,41 +221,46 @@
   (println)
   (println summary))
 
-(defn start! [options]
-  (let [ws-port (:ws-port options ws-port)
-        wss-port (:wss-port options wss-port)
-        ws-server (websocket-server {:port ws-port
-                                     :event-handler #(log/info :evt %)})
-        wss-server (doto (websocket-server {:port wss-port
-                                            :event-handler #(log/info :evt %)})
-                     (.setWebSocketFactory
-                      (DefaultSSLWebSocketServerFactory.
-                       (ssl-context (:keystore options (io/resource "keystore.jks"))
-                                    (:keystore-password options "funnel")))))]
-    (reset! state
-            (cond-> {:ws-server ws-server}
-              wss-server
-              (assoc :wss-server wss-server)))
-    (log/info :starting-ws-server {:port ws-port})
-    (.start ws-server)
-    (log/info :starting-wss-server {:port wss-port})
-    (.start wss-server)
-    {:ws-server ws-server
-     :wss-server wss-server}))
+(defn ws-server [options]
+  (let [ws-port   (:ws-port options ws-port)
+        state     (:state options (atom {}))]
+    (websocket-server {:port ws-port
+                       :state state})))
 
-(defn stop! [{:keys [ws-server wss-server]}]
-  (.stop ^WebSocketServer ws-server)
-  (.stop ^WebSocketServer wss-server))
+(defn wss-server [options]
+  (let [wss-port (:wss-port options wss-port)
+        state (:state options (atom {}))]
+    (doto (websocket-server {:port wss-port
+                             :state state})
+      (.setWebSocketFactory
+       (DefaultSSLWebSocketServerFactory.
+        (ssl-context (:keystore options (io/resource "keystore.jks"))
+                     (:keystore-password options "funnel")))))))
+
+(defn start-server [server]
+  (log/info :ws-server/starting server)
+  (.start ^WebSocketServer server)
+  (log/trace :ws-server/started server)
+  (let [s @server]
+    (if (instance? Throwable s)
+      (throw s)
+      s)))
 
 (defn -main [& args]
   (let [{:keys [options arguments summary]} (cli/parse-opts args option-specs)]
     (init-logging (:verbose options))
     (if (:help options)
       (print-help summary)
-      (start! options))))
+      (let [opts (assoc options :state (atom {}))]
+        (start-server (ws-server opts))
+        (start-server (wss-server opts))))))
 
 ;;socket = new WebSocket("wss://localhost:44221")
 (comment
 
   (init-logging 3)
+
+  (intern 'user 'foo 123)
+
+  (log/error :foo :bar :exception (Exception. "123"))
   )

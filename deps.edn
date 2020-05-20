@@ -13,7 +13,11 @@
  :aliases
  {:test
   {:extra-paths ["test"]
-   :extra-deps  {lambdaisland/kaocha {:mvn/version "0.0-601"}}}
+   :extra-deps  {lambdaisland/kaocha        {:mvn/version "0.0-601"}
+                 nubank/matcher-combinators {:mvn/version "1.5.2"}}}
+
+  :main
+  {:main-opts ["-m" "lambdaisland.funnel"]}
 
   :native-image
   {:main-opts ["-m clj.native-image lambdaisland.funnel"

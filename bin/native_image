@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+echo '-=-=-=-=-=- Compiling NATIVE IMAGE -=-=-=-=-=-'
+
+rm -rf classes
+mkdir classes
+clojure -e "(compile 'lambdaisland.funnel.websocket-server) (compile 'lambdaisland.funnel.log-formatter)"
+clojure -A:native-image

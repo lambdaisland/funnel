@@ -1,8 +1,6 @@
 (ns lambdaisland.funnel
   (:gen-class)
-  (:require [clojure.core.async :as async]
-            [clojure.java.io :as io]
-            [clojure.pprint :as pprint]
+  (:require [clojure.java.io :as io]
             [clojure.tools.cli :as cli]
             [cognitect.transit :as transit]
             [io.pedestal.log :as log])
@@ -16,6 +14,8 @@
            (java.security KeyStore)
            (javax.net.ssl SSLContext
                           KeyManagerFactory)
+           (lambdaisland.funnel websocket_server log_formatter)
+           (lambdaisland.funnel.websocket_server Handler)
            (org.java_websocket WebSocket
                                WebSocketAdapter
                                WebSocketImpl)
@@ -75,27 +75,35 @@
     (catch Exception e
       [::error e])))
 
-(defn handle-message [state conn raw-msg]
-  (let [msg (from-transit raw-msg)]
-    (log/trace :message msg)
-    (when (map? msg)
-      (when-let [whoami (:funnel/whoami msg)]
-        (swap! state assoc-in [conn :whoami] whoami))
-      (when-let [selector (:funnel/subscribe msg)]
-        (swap! state update-in [conn :subscriptions] (fnil conj #{}) selector))
-      (when-let [selector (:funnel/unsubscribe msg)]
-        (swap! state update-in [conn :subscriptions] (fnil disj #{}) selector))
-      )
+(defrecord ServerHandler [state started?]
+  Handler
+  (on-open [this conn handshake]
+    (log/trace :ws/on-open {:conn conn :handshake handshake}))
+  (on-close [this conn code reason remote?]
+    (log/trace :ws/on-close {:conn conn :code code :reason reason :remote? remote?})
+    (swap! state dissoc conn))
+  (on-message [this conn raw-msg]
+    (let [msg (from-transit raw-msg)]
+      (log/trace :ws/on-message {:conn conn :raw-msg raw-msg :msg msg})
+      (when (map? msg)
+        (when-let [whoami (:funnel/whoami msg)]
+          (swap! state assoc-in [conn :whoami] whoami))
+        (when-let [selector (:funnel/subscribe msg)]
+          (swap! state update-in [conn :subscriptions] (fnil conj #{}) selector))
+        (when-let [selector (:funnel/unsubscribe msg)]
+          (swap! state update-in [conn :subscriptions] (fnil disj #{}) selector))
+        )
 
-    )
-  )
+      ))
+  (on-error [this conn ex]
+    (log/error :ws/on-error true :exception ex)
+    (when-not (realized? started?)
+      (deliver started? ex)))
+  (on-start [this server]
+    (deliver started? server))
+  (on-deref [this]
+    @started?))
 
-(defn handle-open [state conn handshake]
-  (let [inbox (async/chan)
-        outbox (async/chan)]))
-
-(defn handle-close [state conn code reason remote?]
-  (swap! state dissoc conn))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WS Server
@@ -109,49 +117,11 @@
     :or   {decoder-count (.. Runtime getRuntime availableProcessors)}
     :as   opts}]
   (let [started? (promise)
-        server (proxy [WebSocketServer java.io.Closeable clojure.lang.IDeref clojure.lang.IMeta]
-                   [^InetSocketAddress
-                    (if host
-                      (InetSocketAddress. ^String host ^long port)
-                      (InetSocketAddress. port))
-                    ^Integer
-                    decoder-count]
-                 (onOpen [^WebSocket conn ^ClientHandshake handshake]
-                   (log/trace :ws-socket/open {:conn conn :handshake handshake})
-                   (handle-open state conn handshake))
-                 (onClose [^WebSocket conn code ^String reason remote?]
-                   (log/trace :ws-socket/close {:conn conn :code code :reason reason :remote? remote?})
-                   (handle-close state conn code reason remote?))
-                 (onMessage [^WebSocket conn ^String message]
-                   (try
-                     (handle-message state conn message)
-                     (catch Exception e
-                       (log/error :handle-message-error {:message message} :exception e))))
-                 (onError [^WebSocket conn ^Exception ex]
-                   (log/error :ws-server/error opts :exception ex)
-                   (when-not (realized? started?)
-                     (deliver started? ex)))
-                 (onStart []
-                   (deliver started? this))
-                 (close []
-                   (try
-                     (log/info :stopping-server this)
-                     (.stop ^WebSocketServer this)
-                     (catch Exception e
-                       (log/error :error-while-stopping-server this :exception e))))
-                 (deref []
-                   @started?)
-                 (meta []
-                   {:type ::server})
-                 (toString []
-                   (pr-str
-                    {:type ::server
-                     :opts opts
-                     :started? (realized? started?)})))]
-    (.addMethod ^clojure.lang.MultiFn pprint/simple-dispatch (class server) (fn [s] (print s)))
+        server (websocket_server. (assoc opts
+                                         :handler (->ServerHandler state started?)))]
     server))
 
-(defmethod print-method ::server [v ^java.io.Writer w]
+(defmethod print-method websocket-server [v ^java.io.Writer w]
   (.write w (.toString ^Object v)))
 
 (defmethod print-method WebSocketImpl [^WebSocketImpl s ^java.io.Writer w]
@@ -178,8 +148,8 @@
     (doto (SSLContext/getInstance "TLS")
       (.init (.getKeyManagers key-manager) nil nil))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CLI
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ;; CLI
 
 (defn init-logging [level]
   (let [root  (java.util.logging.Logger/getLogger "")
@@ -193,20 +163,7 @@
     (.addHandler root
                  (doto (java.util.logging.ConsoleHandler.)
                    (.setLevel level)
-                   (.setFormatter
-                    (proxy [java.util.logging.Formatter] []
-                      (format [^java.util.logging.LogRecord record]
-                        (let [ex (.getThrown record)
-                              sym (gensym "ex")]
-                          (when ex
-                            (intern 'user sym ex))
-                          (str (.getLevel record) " ["
-                               (.getLoggerName record) "] "
-                               (.getMessage record)
-                               (if ex
-                                 (str " => " (.getName (class ex)) " user/" sym)
-                                 "")
-                               "\n")))))))))
+                   (.setFormatter (log_formatter.))))))
 
 (def option-specs
   [[nil "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL"]
@@ -261,6 +218,8 @@
   (init-logging 3)
 
   (intern 'user 'foo 123)
+
+  (def s (start-server (ws-server {:ws-port 45678})))
 
   (log/error :foo :bar :exception (Exception. "123"))
   )

@@ -75,20 +75,40 @@
     (catch Exception e
       [::error e])))
 
-(defn handle-message [state conn raw-msg]
-  (let [msg (from-transit raw-msg)]
+(defn handle-message [state ^WebSocket conn raw-msg]
+  (let [msg (from-transit raw-msg)
+        inbox (:inbox (.getAttachment conn))]
     (log/trace :message msg)
-    (when (map? msg)
-      (when-let [whoami (:funnel/whoami msg)]
-        (swap! state assoc-in [conn :whoami] whoami))
-      (when-let [selector (:funnel/subscribe msg)]
-        (swap! state update-in [conn :subscriptions] (fnil conj #{}) selector))
-      (when-let [selector (:funnel/unsubscribe msg)]
-        (swap! state update-in [conn :subscriptions] (fnil disj #{}) selector))
-      )
+    (if (map? msg)
+      (do
+        (when-let [whoami (:funnel/whoami msg)]
+          (swap! state assoc-in [conn :whoami] whoami))
+        (when-let [selector (:funnel/subscribe msg)]
+          (swap! state update-in [conn :subscriptions] (fnil conj #{}) selector))
+        (when-let [selector (:funnel/unsubscribe msg)]
+          (swap! state update-in [conn :subscriptions] (fnil disj #{}) selector))
 
-    )
-  )
+        (async/>!! inbox (to-transit
+                          (if-let [whomai (:whoami (get @state conn))]
+                            (assoc msg :funnel/whoami whomai)
+                            msg))))
+      (async/>!! inbox raw-msg))))
+
+(defn handle-open [state ^WebSocket conn handshake]
+  (let [inbox (async/chan)
+        outbox (async/chan)]
+    (.setAttachment conn {:inbox inbox
+                          :outbox outbox})
+    (async/go-loop []
+      (let [^String msg (async/<! outbox)]
+        (.send conn msg)
+        (recur)))
+    (async/go-loop []
+      (let [^String msg (async/<! inbox)]
+        (doseq [^WebSocket c (keys @state)
+                :when (not= c conn)]
+          (async/>! (:outbox (.getAttachment c)) msg))
+        (recur)))))
 
 (defn handle-close [state conn code reason remote?]
   (swap! state dissoc conn))
@@ -114,7 +134,7 @@
                     decoder-count]
                  (onOpen [^WebSocket conn ^ClientHandshake handshake]
                    (log/trace :ws-socket/open {:conn conn :handshake handshake})
-                   #_(handle-open state conn handshake))
+                   (handle-open state conn handshake))
                  (onClose [^WebSocket conn code ^String reason remote?]
                    (log/trace :ws-socket/close {:conn conn :code code :reason reason :remote? remote?})
                    (handle-close state conn code reason remote?))

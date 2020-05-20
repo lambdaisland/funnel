@@ -47,10 +47,10 @@
 (comment
   (require '[kaocha.repl :as kaocha])
 
-  (kaocha/run `state-test)
+  (kaocha/run)
   (kaocha.repl/run
 
-    'lambdaisland.funnel-test/whoami-test
+    'lambdaisland.funnel-test/subscribe-test
     )
 
 

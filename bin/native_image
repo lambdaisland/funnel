@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -e
+
+echo '-=-=-=-=-=- Compiling NATIVE IMAGE -=-=-=-=-=-'
+
+git --no-pager diff
+
+rm -rf classes
+mkdir classes
+#_clojure -e "(compile 'lambdaisland.funnel.websocket-server) (compile 'lambdaisland.funnel.log-formatter)"
+
+set +e
+clojure -A:native-image
+
+
+if [ ! $? -eq 0 ]; then
+    notify-send "native-image failed"
+else
+    ls -lh funnel
+fi

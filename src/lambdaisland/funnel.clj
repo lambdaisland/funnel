@@ -90,10 +90,6 @@
     )
   )
 
-(defn handle-open [state conn handshake]
-  (let [inbox (async/chan)
-        outbox (async/chan)]))
-
 (defn handle-close [state conn code reason remote?]
   (swap! state dissoc conn))
 
@@ -118,7 +114,7 @@
                     decoder-count]
                  (onOpen [^WebSocket conn ^ClientHandshake handshake]
                    (log/trace :ws-socket/open {:conn conn :handshake handshake})
-                   (handle-open state conn handshake))
+                   #_(handle-open state conn handshake))
                  (onClose [^WebSocket conn code ^String reason remote?]
                    (log/trace :ws-socket/close {:conn conn :code code :reason reason :remote? remote?})
                    (handle-close state conn code reason remote?))
@@ -148,7 +144,7 @@
                     {:type ::server
                      :opts opts
                      :started? (realized? started?)})))]
-    (.addMethod ^clojure.lang.MultiFn pprint/simple-dispatch (class server) (fn [s] (print s)))
+    #_(.addMethod ^clojure.lang.MultiFn pprint/simple-dispatch (class server) (fn [s] (print s)))
     server))
 
 (defmethod print-method ::server [v ^java.io.Writer w]
@@ -198,8 +194,8 @@
                       (format [^java.util.logging.LogRecord record]
                         (let [ex (.getThrown record)
                               sym (gensym "ex")]
-                          (when ex
-                            (intern 'user sym ex))
+                          #_(when ex
+                              (intern 'user sym ex))
                           (str (.getLevel record) " ["
                                (.getLoggerName record) "] "
                                (.getMessage record)

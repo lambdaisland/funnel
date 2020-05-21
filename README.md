@@ -89,6 +89,10 @@ This will create a persistent subscription, all incoming messages matching the
 selector will be forwarded to the client that issued the subscription. A client
 can create multiple subscriptions.
 
+Note that the current sender is always excluded, so a message is never sent back
+to the sender, even if a subscription or broadcast selector matches the
+`:funnel/whoami` of the sender.
+
 ### `:funnel/unsubscribe`
 
 To remove a subscription, use the `:funnel/unsubscribe` key with the same

@@ -2,7 +2,12 @@
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
             [lambdaisland.funnel :as funnel]
-            [lambdaisland.funnel.test-util :refer [test-client test-server with-available-port will match?]]
+            [lambdaisland.funnel.test-util :refer [*port*
+                                                   available-port
+                                                   test-client
+                                                   test-server
+                                                   with-available-port
+                                                   will match?]]
             [matcher-combinators.matchers :as m])
   (:import (java.net URI)
            (java.net Socket ServerSocket ConnectException)
@@ -32,64 +37,116 @@
         (will (= [{:whoami {:id :abc :hello :world}}] (vals @state)))))))
 
 (deftest subscribe-test
-  (with-open [_ (test-server)
+  (testing "messages get forwarded to subscriber"
+    (with-open [_ (test-server)
+                c1 (test-client)
+                c2 (test-client)
+                c3 (test-client)]
+      (c1 {:funnel/whoami {:id 1}
+           :funnel/subscribe [:id 2]})
+      (c2 {:funnel/whoami {:id 2}
+           :foo :bar})
+      (c3 {:funnel/whoami {:id 3}})
+      (c2 {:foo :baz})
+      (will (= @(:history c1) [{:funnel/whoami {:id 2}
+                                :foo :bar}
+                               {:funnel/whoami {:id 2}
+                                :foo :baz}]))
+      (will (= @(:history c2) []))
+      (will (= @(:history c3) [])))))
+
+(deftest unsubscribe-test
+  (let [state (atom {})]
+    (with-open [s (test-server state)
+                c (test-client)]
+      (c {:funnel/subscribe [:foo :bar]})
+      (will (= [{:subscriptions #{[:foo :bar]}}] (vals @state)))
+      (c {:funnel/unsubscribe [:foo :bar]})
+      (will (= [{:subscriptions #{}}] (vals @state))))))
+
+(deftest match-selector-test
+  (is (funnel/match-selector? {:id 123} [:id 123]))
+  (is (not (funnel/match-selector? nil [:id 123])))
+  (is (funnel/match-selector? nil true))
+  (is (not (funnel/match-selector? {:id 123} [:id 456]))))
+
+(deftest destinations-test
+  (let [state {:ws1 {:whoami {:id :ws1}
+                     :subscriptions #{[:id :ws2]}}
+               :ws2 {:whoami {:id :ws2}}
+               :ws3 {:whoami {:id :ws3}}}]
+
+    (is (= [:ws1] (funnel/destinations :ws2 nil state)))
+    (is (match? (m/in-any-order [:ws1 :ws3])
+                (funnel/destinations :ws2 true state)))
+    (is (match? (m/in-any-order [:ws1 :ws3])
+                (funnel/destinations :ws2 [:id :ws3] state)))
+    (is (= [:ws3] (funnel/destinations :ws1 [:id :ws3] state)))))
+
+(deftest query-test
+  (with-open [s (test-server)
               c1 (test-client)
-              c2 (test-client)]
-    (c1 {:funnel/subscribe [:id "123"]})
-    (c2 {:funnel/whoami {:id "123"}
-         :foo :bar})
-    (c2 {:foo :baz})
-    (will (= @(:history c1) [{:funnel/whoami {:id "123"}
-                              :foo :bar}
-                             {:funnel/whoami {:id "123"}
-                              :foo :baz}]))))
+              c2 (test-client)
+              c3 (test-client)]
+    (c1 {:funnel/query true})
+    (will (= [{:funnel/clients []}] @(:history c1)))
+
+    (c1 {:funnel/whoami {:id 123 :type :x}})
+    (c2 {:funnel/whoami {:id 456 :type :x}})
+    (c3 {:funnel/whoami {:id 789 :type :y}})
+
+    (reset! (:history c1) [])
+    (c1 {:funnel/query true})
+    (will (= [{:funnel/clients
+               [{:id 456 :type :x}
+                {:id 789 :type :y}]}]
+             @(:history c1)))
+
+    (c2 {:funnel/query [:id 789]})
+    (will (= [{:funnel/clients
+               [{:id 789 :type :y}]}]
+             @(:history c2)))
+
+    (c3 {:funnel/query [:type :x]})
+    (will (= [{:funnel/clients
+               [{:id 123 :type :x}
+                {:id 456 :type :x}]}]
+             @(:history c3)))
+    )
+  )
+
 
 (comment
   (require '[kaocha.repl :as kaocha])
 
-  (kaocha/run)
-  (kaocha.repl/run
+  (kaocha.repl/run `destinations-test)
 
-    'lambdaisland.funnel-test/subscribe-test
-    )
+  (kaocha.repl/run 'lambdaisland.funnel-test/query-test)
 
+  (alter-var-root #'*port* (constantly (available-port)))
 
-  (with)
-  (let [state (atom {})]
-    (with-open [s (test-server state)
-                c (test-client)]
-      (c {:funnel/whoami {:id "123"}})
-      @state
-      ))
-
-  (time
-   (with-available-port
-     ))
-
-  (def x (let [s (test-server)
-               c (test-client)]
-           (.close c)
-           (.close s)
-           s))
-
-  (def x
-    (let [state (atom {})
-          server (test-server state)]
-      server))
-  (.close x)
   (def state (atom {}))
-  (def s (let [s (test-server (atom {}))] s))
-  (.close s)
-  (def c (test-client))
-  (.close c)
-  (clojure.pprint/pprint)
+  (def s (test-server state))
 
-  (c {:funnel/whoami {:foo :barrrr}
-      :funnel/subscribe [:type :hello]})
-  @state
+  (def c1 (test-client))
+  (def c2 (test-client))
+  (def c3 (test-client))
 
-  state
+  (c1 {:funnel/whoami {:id :c1}})
+  (c2 {:funnel/whoami {:id :c2}})
+  (c3 {:funnel/whoami {:id :c3}})
 
-  (.getSelectionKey s)
+  (c1 {:funnel/broadcast true
+       :foo :bar})
+
+  (c1 {:funnel/query true})
+  (vals @state)
+  @(:history c1)
+
+  (do
+    (.close s)
+    (.close c1)
+    (.close c2)
+    (.close c3))
 
   )

@@ -75,43 +75,85 @@
     (catch Exception e
       [::error e])))
 
+(defn match-selector? [whoami selector]
+  (cond
+    (true? selector) true
+    (vector? selector) (= (second selector) (get whoami (first selector)))))
+
+(defn destinations [source broadcast-sel conns]
+  (let [whoami (get-in conns [source :whoami])]
+    (map key
+         (filter
+          (fn [[c m]]
+            (and (or (match-selector? (:whoami m) broadcast-sel)
+                     (some #(match-selector? whoami %) (:subscriptions m)))
+                 (not= c source)))
+          conns))))
+
+(defn outbox [^WebSocket conn]
+  (.getAttachment conn))
+
+(defn handle-query [conn selector conns]
+  (let [msg (to-transit
+             {:funnel/clients
+              (map (comp :whoami val)
+                   (filter
+                    (fn [[c m]]
+                      (and (match-selector? (:whoami m) selector)
+                           (not= c conn)))
+                    conns))})]
+    (if-let [e (maybe-error msg)]
+      (log/error :query-encoding-failed {:selector selector :conns (vals conns)} :exception e)
+      (async/>!! (outbox conn) msg))))
+
 (defn handle-message [state ^WebSocket conn raw-msg]
   (let [msg (from-transit raw-msg)
         inbox (:inbox (.getAttachment conn))]
-    (log/trace :message msg)
-    (if (map? msg)
-      (do
-        (when-let [whoami (:funnel/whoami msg)]
-          (swap! state assoc-in [conn :whoami] whoami))
-        (when-let [selector (:funnel/subscribe msg)]
-          (swap! state update-in [conn :subscriptions] (fnil conj #{}) selector))
-        (when-let [selector (:funnel/unsubscribe msg)]
-          (swap! state update-in [conn :subscriptions] (fnil disj #{}) selector))
+    (when-let [e (maybe-error msg)]
+      (log/warn :message-decoding-failed {:raw-msg raw-msg :desc "Raw message will be forwarded"} :exception e))
+    (let [[msg broadcast]
+          (if-not (map? msg)
+            [raw-msg nil]
+            (do
+              (when-let [whoami (:funnel/whoami msg)]
+                (swap! state assoc-in [conn :whoami] whoami))
+              (when-let [selector (:funnel/subscribe msg)]
+                (swap! state update-in [conn :subscriptions] (fnil conj #{}) selector))
+              (when-let [selector (:funnel/unsubscribe msg)]
+                (swap! state update-in [conn :subscriptions] (fnil disj #{}) selector))
+              (when-let [selector (:funnel/query msg)]
+                (handle-query conn selector @state))
 
-        (async/>!! inbox (to-transit
-                          (if-let [whomai (:whoami (get @state conn))]
-                            (assoc msg :funnel/whoami whomai)
-                            msg))))
-      (async/>!! inbox raw-msg))))
+              [(to-transit
+                (if-let [whomai (:whoami (get @state conn))]
+                  (assoc msg :funnel/whoami whomai)
+                  msg))
+               (:funnel/broadcast msg)]))]
+      (if-let [e (maybe-error msg)]
+        (log/error :message-encoding-failed {:msg msg} :exception e)
+        (do
+          (let [conns @state
+                dests (destinations conn broadcast conns)]
+            (log/debug :message msg :sending-to (map (comp :whoami conns) dests))
+            (doseq [^WebSocket c dests]
+              (async/>!! (outbox c) msg))))))))
 
 (defn handle-open [state ^WebSocket conn handshake]
-  (let [inbox (async/chan)
-        outbox (async/chan)]
-    (.setAttachment conn {:inbox inbox
-                          :outbox outbox})
+  (log/info :connection-opened {:remote-socket-address (.getRemoteSocketAddress conn)})
+  (let [outbox (async/chan 8 (map #(doto % prn)))]
+    (.setAttachment conn outbox)
     (async/go-loop []
-      (let [^String msg (async/<! outbox)]
+      (when-let [^String msg (async/<! outbox)]
         (.send conn msg)
-        (recur)))
-    (async/go-loop []
-      (let [^String msg (async/<! inbox)]
-        (doseq [^WebSocket c (keys @state)
-                :when (not= c conn)]
-          (async/>! (:outbox (.getAttachment c)) msg))
         (recur)))))
 
-(defn handle-close [state conn code reason remote?]
-  (swap! state dissoc conn))
+(defn handle-close [state ^WebSocket conn code reason remote?]
+  (log/info :connection-closed {:whoami (:whoami (get @state conn))
+                                :code code
+                                :reason reason
+                                :closed-by-remote? remote?})
+  (swap! state dissoc conn)
+  (async/close! (outbox conn)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WS Server
@@ -136,7 +178,6 @@
                    (log/trace :ws-socket/open {:conn conn :handshake handshake})
                    (handle-open state conn handshake))
                  (onClose [^WebSocket conn code ^String reason remote?]
-                   (log/trace :ws-socket/close {:conn conn :code code :reason reason :remote? remote?})
                    (handle-close state conn code reason remote?))
                  (onMessage [^WebSocket conn ^String message]
                    (try
@@ -165,7 +206,8 @@
                      :opts opts
                      :started? (realized? started?)})))]
     #_(.addMethod ^clojure.lang.MultiFn pprint/simple-dispatch (class server) (fn [s] (print s)))
-    server))
+    (doto server
+      (.setReuseAddr true))))
 
 (defmethod print-method ::server [v ^java.io.Writer w]
   (.write w (.toString ^Object v)))
@@ -180,6 +222,11 @@
                      :remote-socket-address (.getRemoteSocketAddress s)
                      :local-socket-address (.getLocalSocketAddress s)
                      :resource-descriptor (.getResourceDescriptor s)})))
+
+(defmethod print-method InetSocketAddress [^InetSocketAddress a ^java.io.Writer w]
+  (.write w "#InetSocketAddress \"")
+  (.write w (.getHostString a))
+  (.write w (str ":" (.getPort a) "\"")))
 
 (defn ssl-context [keystore password]
   (let [key-manager (KeyManagerFactory/getInstance (KeyManagerFactory/getDefaultAlgorithm))
@@ -254,9 +301,7 @@
                      (:keystore-password options "funnel")))))))
 
 (defn start-server [server]
-  (log/info :ws-server/starting server)
   (.start ^WebSocketServer server)
-  (log/trace :ws-server/started server)
   (let [s @server]
     (if (instance? Throwable s)
       (throw s)
@@ -269,9 +314,10 @@
       (print-help summary)
       (let [opts (assoc options :state (atom {}))]
         (start-server (ws-server opts))
-        (start-server (wss-server opts))))))
+        (start-server (wss-server opts))
+        (log/info :started [(str "ws://localhost:" (:ws-port options ws-port))
+                            (str "wss://localhost:" (:wss-port options wss-port))])))))
 
-;;socket = new WebSocket("wss://localhost:44221")
 (comment
 
   (init-logging 3)

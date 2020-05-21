@@ -68,9 +68,9 @@
   ([]
    (test-server (atom {})))
   ([state-atom]
-   (doto (->  {:ws-port *port*
-               :state state-atom}
-              funnel/ws-server
-              funnel/start-server)
-     (.setReuseAddr true)
-     (.setTcpNoDelay true))))
+   (funnel/start-server
+    (doto (->  {:ws-port *port*
+                :state state-atom}
+               funnel/ws-server)
+
+      (.setTcpNoDelay true)))))

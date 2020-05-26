@@ -10,3 +10,5 @@ node_modules/
 .DS_Store
 classes
 /funnel
+pom.xml
+.store

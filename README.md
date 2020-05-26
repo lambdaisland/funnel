@@ -53,8 +53,10 @@ When a message contains a `:funnel/whoami` key, then the value of that key MUST
 be a map with identifying information.
 
 The `:funnel/whoami` map SHOULD contain an `:id`, `:type`, and `:description`,
-but it can basically contain anything. The map keys and values MUST have value
-semantics (be comparable with `=`).
+but it can basically contain anything. Map keys SHOULD be keywords (qualified or
+not), map values SHOULD be atomic/primitive (e.g. strings, keywords, numbers.
+Not collections). Use of other types as keys or values is reserved for future
+extension.
 
 ``` clojure
 {:funnel/whoami {:id "firefox-123"
@@ -74,10 +76,9 @@ If funnel receives a new `:funnel/whoami` then it will replace the old one.
 
 A client who wishes to receive messages sent by a subset of connected clients
 can send a message containing a `:funnel/subscribe`. The value of
-`:funnel/subscribe` is a _selector_.
+`:funnel/subscribe` is a _selector_. See the [Selector](#selector) section for
+defaults.
 
-Currently a selector can be either a two-element vector, corresponding with a
-key/value pair found in the whoami-map, or `true`, which matches all clients.
 
 ``` clojure
 {:funnel/whoami {:id "test-suite-abc-123"
@@ -132,6 +133,40 @@ sequence of whoami-maps, based on the selector.
    ,,,}
   ,,,]}
 ```
+
+## Selectors
+
+`:funnel/subscribe`, `:funnel/unsubscribe`, and `:funnel/query` all take a
+_selector_ as their associated value. A selector is an EDN value, this value is
+matched against the stored `:funnel/whoami` maps to select a subset of clients.
+
+Note that a message is never echoed back to the sending client, if if that
+client would in principle be included in the selection.
+
+### `true`
+
+The boolean value `true` matches all connected clients (except the client the
+message came from). This includes clients that have connected but have not
+identified themselves by sending a whoami map. This is the only selector that
+can select clients without stored whoami data.
+
+### two-element vector
+
+Interpreted as a key-value pair, will match all clients whose whoami map
+contains exactly this key and associated value.
+
+Note that while the current implementation simply compares values for equality,
+we only officially support (and thus guarantee backwards compatibility) for
+"atomic" values: strings, keywords, symbols, numbers, booleans. The behavior of
+collections (maps, vectors, etc) as values in whoami maps, or in selectors, is
+undefined, and may change in the future.
+
+### Map
+
+Will map all clients whose whoami maps contain identical key-value pairs as the
+given map. Note that there may be extra information in the whoami map, this is
+ignored. Same caveat as above: the behavior of collections as values is reserved
+for future extension.
 
 ## Message forwarding
 

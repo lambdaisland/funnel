@@ -1,0 +1,98 @@
+name: native_image
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+
+env:
+  CLOJURE_CLI_VERSION: '1.10.1.536'
+  GRAALVM_VERSION: '19.3.1.java11'
+  PROJECT: funnel
+
+jobs:
+  native-image:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            suffix: linux-amd64
+          - os: macOS-latest
+            suffix: darwin-amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: DeLaGuardo/setup-graalvm@2.0
+        with:
+          graalvm-version: ${{ env.GRAALVM_VERSION }}
+      - uses: DeLaGuardo/setup-clojure@2.0
+        with:
+          tools-deps: ${{ env.CLOJURE_CLI_VERSION }}
+      - name: Build native image
+        run: |
+          gu install native-image
+          bin/native_image
+      - name: Rename
+        run: mv ${{ env.PROJECT }} ${{ env.PROJECT }}.${{ matrix.suffix }}
+      - uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.PROJECT }}.${{ matrix.suffix }}
+          path: ./${{ env.PROJECT }}.${{ matrix.suffix }}
+
+  create-release:
+    needs: [native-image]
+    if: contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: DeLaGuardo/setup-clojure@2.0
+        with:
+          tools-deps: ${{ env.CLOJURE_CLI_VERSION }}
+
+      - name: Get release notes
+        id: get-release-notes
+        run: |
+          bin/proj gh_actions_changelog_output
+
+      - uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          body: ${{ steps.get-release-notes.outputs.changelog }}
+          draft: true
+          prerelease: true
+
+      - uses: actions/download-artifact@master
+        with:
+          name: ${{ env.PROJECT }}.linux-amd64
+          path: tmp
+
+      - uses: actions/upload-release-asset@v1
+        id: upload-linux-release-asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./tmp/${{ env.PROJECT }}.linux-amd64
+          asset_name: ${{ env.PROJECT }}.linux-amd64
+          asset_content_type: application/octet-stream
+
+      - uses: actions/download-artifact@master
+        with:
+          name: ${{ env.PROJECT }}.darwin-amd64
+          path: tmp
+
+      - uses: actions/upload-release-asset@v1
+        id: upload-darwin-release-asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./tmp/${{ env.PROJECT }}.darwin-amd64
+          asset_name: ${{ env.PROJECT }}.darwin-amd64
+          asset_content_type: application/octet-stream

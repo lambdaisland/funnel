@@ -21,6 +21,8 @@
 
   :native-image
   {:main-opts ["-m clj.native-image lambdaisland.funnel"
+               "--echo"
+               "--"
                "--initialize-at-build-time"
                "--no-fallback"
                "--enable-https"
@@ -31,6 +33,8 @@
                #_"--report-unsupported-elements-at-runtime"]
    :jvm-opts  ["-Dclojure.compiler.direct-linking=true"]
    :extra-deps
-   {clj.native-image             {:local/root "../../clj.native-image"}
+   {clj.native-image             {#_#_:local/root "../clj.native-image"
+                                  :sha "e6a8364857c6ecb2685ec271f65ae480d938aea8"
+                                  :git/url "https://github.com/lambdaisland/clj.native-image"}
     org.clojure/tools.deps.alpha {:mvn/version "0.7.516"
                                   :exclusions  [org.slf4j/slf4j-nop]}}}}}

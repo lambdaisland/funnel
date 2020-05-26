@@ -65,10 +65,19 @@
       (will (= [{:subscriptions #{}}] (vals @state))))))
 
 (deftest match-selector-test
-  (is (funnel/match-selector? {:id 123} [:id 123]))
-  (is (not (funnel/match-selector? nil [:id 123])))
-  (is (funnel/match-selector? nil true))
-  (is (not (funnel/match-selector? {:id 123} [:id 456]))))
+  (testing "vector"
+    (is (funnel/match-selector? {:id 123} [:id 123]))
+    (is (not (funnel/match-selector? nil [:id 123])))
+    (is (not (funnel/match-selector? {:id 123} [:id 456]))))
+
+  (testing "true"
+    (is (funnel/match-selector? {:id 123} true))
+    (is (funnel/match-selector? nil true)))
+
+  (testing "map"
+    (is (funnel/match-selector? {:type :x :subtype :a} {:type :x}))
+    (is (funnel/match-selector? {:type :x :subtype :a} {:type :x :subtype :a}))
+    (is (not (funnel/match-selector? {:type :x :subtype :a} {:type :x :subtype :b})))))
 
 (deftest destinations-test
   (let [state {:ws1 {:whoami {:id :ws1}
@@ -97,10 +106,10 @@
 
     (reset! (:history c1) [])
     (c1 {:funnel/query true})
-    (will (= [{:funnel/clients
-               [{:id 456 :type :x}
-                {:id 789 :type :y}]}]
-             @(:history c1)))
+    (will (match? [{:funnel/clients
+                    (m/in-any-order [{:id 456 :type :x}
+                                     {:id 789 :type :y}])}]
+                  @(:history c1)))
 
     (c2 {:funnel/query [:id 789]})
     (will (= [{:funnel/clients
@@ -108,12 +117,25 @@
              @(:history c2)))
 
     (c3 {:funnel/query [:type :x]})
-    (will (= [{:funnel/clients
-               [{:id 123 :type :x}
-                {:id 456 :type :x}]}]
-             @(:history c3)))
-    )
-  )
+    (will (match? [{:funnel/clients
+                    (m/in-any-order [{:id 123 :type :x}
+                                     {:id 456 :type :x}])}]
+                  @(:history c3))))
+
+  (testing "map queries"
+    (with-open [s (test-server)
+                c1 (test-client)
+                c2 (test-client)
+                c3 (test-client)]
+      (c1 {:funnel/whoami {:id 123 :type :x :subtype :a}})
+      (c2 {:funnel/whoami {:id 456 :type :x :subtype :b}})
+      (c3 {:funnel/whoami {:id 789 :type :y :subtype :b}})
+
+      (c1 {:funnel/query {:type :x :subtype :b}})
+      (will (= [{:funnel/clients
+                 [{:id 456 :type :x :subtype :b}]}]
+               @(:history c1))))))
+
 
 
 (comment

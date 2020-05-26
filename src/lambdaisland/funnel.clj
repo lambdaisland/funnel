@@ -77,8 +77,14 @@
 
 (defn match-selector? [whoami selector]
   (cond
-    (true? selector) true
-    (vector? selector) (= (second selector) (get whoami (first selector)))))
+    (true? selector)   true
+    (vector? selector) (= (second selector) (get whoami (first selector)))
+    (map? selector)    (reduce (fn [_ [k v]]
+                                 (if (= v (get whoami k))
+                                   true
+                                   (reduced false)))
+                               nil
+                               selector)))
 
 (defn destinations [source broadcast-sel conns]
   (let [whoami (get-in conns [source :whoami])]
@@ -113,8 +119,11 @@
       (log/warn :message-decoding-failed {:raw-msg raw-msg :desc "Raw message will be forwarded"} :exception e))
     (let [[msg broadcast]
           (if-not (map? msg)
-            [raw-msg nil]
             (do
+              (log/warn :forwarding-raw-message raw-msg)
+              [raw-msg nil])
+            (do
+              (log/debug :message msg)
               (when-let [whoami (:funnel/whoami msg)]
                 (swap! state assoc-in [conn :whoami] whoami))
               (when-let [selector (:funnel/subscribe msg)]
@@ -134,17 +143,18 @@
         (do
           (let [conns @state
                 dests (destinations conn broadcast conns)]
-            (log/debug :message msg :sending-to (map (comp :whoami conns) dests))
+            (log/trace :message msg :sending-to (map (comp :whoami conns) dests))
             (doseq [^WebSocket c dests]
               (async/>!! (outbox c) msg))))))))
 
 (defn handle-open [state ^WebSocket conn handshake]
   (log/info :connection-opened {:remote-socket-address (.getRemoteSocketAddress conn)})
-  (let [outbox (async/chan 8 (map #(doto % prn)))]
+  (let [outbox (async/chan 8 #_(map #(doto % prn)))]
     (.setAttachment conn outbox)
     (async/go-loop []
       (when-let [^String msg (async/<! outbox)]
-        (.send conn msg)
+        (when (.isOpen conn)
+          (.send conn msg))
         (recur)))))
 
 (defn handle-close [state ^WebSocket conn code reason remote?]

@@ -28,6 +28,24 @@ lifetime of the JavaScript runtime.
 To make that concrete, a test runner invoked multiple times from the command
 line can run commands in the same pre-existing browser tab.
 
+## Installation
+
+You can download pre-compiled binaries for Linux and Mac OS from the
+[releases](https://github.com/lambdaisland/funnel/releases) page, or run it with
+this one-liner.
+
+``` shell
+clojure -Sdeps '{:deps {lambdaisland/funnel {:mvn/version "0.1.16"}}}' -m lambdaisland.funnel --help
+```
+
+Note that by default Funnel provides very little output, only errors and
+warnings are displayed. You can increase the verbosity with `--verbose`/`-v`
+which can be supplied up to three times
+
+``` shell
+./funnel -vvv
+```
+
 ## Specifics
 
 Funnel listens on port 44220 (without ssl) and 44221 (with ssl). The SSL port is
@@ -202,6 +220,17 @@ of the form
 Subscribers are *not* notified of new connections per-se, instead when a client
 announces itself with a `:funnel/whoami` then that first message will be
 forwarded to matching subscribers (like any other message).
+
+## Testing / debugging with jet and websocat
+
+[jet](https://github.com/borkdude/jet) lets you convert easily between EDN and
+Transit. [websocat](https://github.com/vi/websocat) provides a command line
+interface for websockets. Together they form a great way for doing ad-hoc
+communication with Funnel.
+
+``` shell
+echo '{:funnel/query true}' | jet --to transit | websocat ws://localhost:44220 | jet --from transit
+```
 
 ## Prior Art
 

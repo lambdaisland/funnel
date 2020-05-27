@@ -3,7 +3,7 @@
 Transit-over-WebSocket Message Relay
 
 <!-- badges -->
-[![CircleCI](https://circleci.com/gh/lambdaisland/funnel.svg?style=svg)](https://circleci.com/gh/lambdaisland/funnel) [![cljdoc badge](https://cljdoc.org/badge/lambdaisland/funnel)](https://cljdoc.org/d/lambdaisland/funnel) [![Clojars Project](https://img.shields.io/clojars/v/lambdaisland/funnel.svg)](https://clojars.org/lambdaisland/funnel)
+[![cljdoc badge](https://cljdoc.org/badge/lambdaisland/funnel)](https://cljdoc.org/d/lambdaisland/funnel) [![Clojars Project](https://img.shields.io/clojars/v/lambdaisland/funnel.svg)](https://clojars.org/lambdaisland/funnel)
 <!-- /badges -->
 
 ## What is it?

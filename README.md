@@ -8,9 +8,11 @@ Transit-over-WebSocket Message Relay
 
 ## What is it?
 
-Funnel is a WebSocket relay. It accepts connections from multiple clients, and
-then acts as a go-between, funneling messages between them. Messages can be
-addressed at a specific client, or broadcasted to a selection of clients.
+Funnel is a WebSocket message relay. It accepts connections from multiple
+clients, and then acts as a go-between, funneling messages between them, with
+flexible mechanisms for setting up message routing, either by the sender
+(broadcast) or receiver (subscribe). It also provides discoverability, so
+clients can find out who is there to talk to.
 
 ## What is it for?
 

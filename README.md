@@ -59,7 +59,7 @@ You can download pre-compiled binaries for Linux and Mac OS from the
 this one-liner.
 
 ``` shell
-clojure -Sdeps '{:deps {lambdaisland/funnel {:mvn/version "0.1.16"}}}' -m lambdaisland.funnel --help
+clojure -Sdeps '{:deps {lambdaisland/funnel {:mvn/version "0.1.25"}}}' -m lambdaisland.funnel --help
 ```
 
 Note that by default Funnel provides very little output, only errors and

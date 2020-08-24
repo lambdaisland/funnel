@@ -52,9 +52,7 @@ which can be supplied up to three times
 
 Funnel listens on port 44220 (without ssl) and 44221 (with ssl). The SSL port is
 provided for when connecting from an HTTPS context where unencrypted connections
-are not allowed. It uses a self-signed certificate. To use this from a browser,
-go to `https://localhost:44221` and accept the certificate. After that websocket
-connections to `wss://localhost:44221` should work.
+are not allowed.
 
 To use your own certificate, provide a Java KeyStore with `--keystore FILENAME`,
 and `--keystore-password PASSWORD`.

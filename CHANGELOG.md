@@ -1,10 +1,8 @@
 # Unreleased
 
-## Added
-
 ## Fixed
 
-## Changed
+- Use a certificate with SAN=dns:localhost, so browsers accept it automatically.
 
 # 0.1.16 (2020-05-26 / 81b2e61)
 

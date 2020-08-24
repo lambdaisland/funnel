@@ -1,0 +1,2 @@
+#!/bin/sh
+keytool -genkey -keyalg RSA -alias selfsigned -keystore resources/keystore.jks -storepass funnel -keysize 2048 -dname "CN=Funnel, OU=Unknown, O=Lambda Island, L=Unknown, ST=Unknown, C=Unknown" -ext SAN=dns:localhost,ip:127.0.0.1,ip:::1

@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>lambdaisland</groupId>
   <artifactId>funnel</artifactId>
-  <version>0.1.25</version>
+  <version>0.1.29</version>
   <name>funnel</name>
   <description>Transit-over-WebSocket Message Relay</description>
   <url>https://github.com/lambdaisland/funnel</url>
@@ -22,7 +22,7 @@
     <url>https://github.com/lambdaisland/funnel</url>
     <connection>scm:git:git://github.com/lambdaisland/funnel.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/lambdaisland/funnel.git</developerConnection>
-    <tag>15a47c7736bcc25d15c2db4e60008f90c5877af6</tag>
+    <tag>5185fcaf05766678d53576cf8b0ac0f31da3d68f</tag>
   </scm>
   <dependencies>
     <dependency>
@@ -70,16 +70,24 @@
       <resource>
         <directory>resources</directory>
       </resource>
+      <resource>
+        <directory>lib</directory>
+      </resource>
     </resources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.8.1</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>2.4</version>
+        <version>3.2.0</version>
         <configuration>
           <archive>
             <manifestEntries>
-              <git-revision>15a47c7736bcc25d15c2db4e60008f90c5877af6</git-revision>
+              <git-revision>5185fcaf05766678d53576cf8b0ac0f31da3d68f</git-revision>
             </manifestEntries>
           </archive>
         </configuration>
@@ -87,7 +95,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-gpg-plugin</artifactId>
-        <version>1.5</version>
+        <version>1.6</version>
         <executions>
           <execution>
             <id>sign-artifacts</id>

@@ -11,3 +11,5 @@ node_modules/
 classes
 /funnel
 .store
+lib
+*.class

@@ -10,12 +10,18 @@
                                   WriteHandler)
            (java.io ByteArrayInputStream
                     ByteArrayOutputStream
-                    FileInputStream)
-           (java.net InetSocketAddress)
+                    FileInputStream
+                    FileOutputStream
+                    PrintStream
+                    IOException)
+           (java.net InetSocketAddress Socket)
            (java.nio ByteBuffer)
+           (java.nio.file Files Path Paths)
            (java.security KeyStore)
+           (java.util Comparator)
            (javax.net.ssl SSLContext
                           KeyManagerFactory)
+           (lambdaisland.funnel Daemon)
            (org.java_websocket WebSocket
                                WebSocketAdapter
                                WebSocketImpl)
@@ -24,7 +30,8 @@
            (org.java_websocket.handshake ClientHandshake)
            (org.java_websocket.server DefaultWebSocketServerFactory
                                       DefaultSSLWebSocketServerFactory
-                                      WebSocketServer)))
+                                      WebSocketServer)
+           (sun.misc Signal)))
 
 (set! *warn-on-reflection* true)
 
@@ -33,6 +40,11 @@
 
 (def ws-port  44220)
 (def wss-port 44221)
+
+(Thread/setDefaultUncaughtExceptionHandler
+ (reify Thread$UncaughtExceptionHandler
+   (uncaughtException [_ thread ex]
+     (log/error :uncaught-exception {:thread (.getName thread)} :exception ex))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Transit
@@ -254,7 +266,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CLI
 
-(defn init-logging [level]
+(defn init-logging [level logfile]
   (let [root  (java.util.logging.Logger/getLogger "")
         level (case (long  level)
                 0 java.util.logging.Level/WARNING
@@ -263,11 +275,10 @@
                 java.util.logging.Level/FINEST)]
     (run! #(.removeHandler root %) (.getHandlers root))
     (.setLevel root level)
-    (.addHandler root
-                 (doto (java.util.logging.ConsoleHandler.)
-                   (.setLevel level)
-                   (.setFormatter
-                    (proxy [java.util.logging.Formatter] []
+    (let [handler (if (and logfile (not= "-" logfile))
+                    (java.util.logging.FileHandler. logfile)
+                    (java.util.logging.ConsoleHandler.))
+          formatter (proxy [java.util.logging.Formatter] []
                       (format [^java.util.logging.LogRecord record]
                         (let [ex (.getThrown record)
                               sym (gensym "ex")]
@@ -279,15 +290,28 @@
                                (if ex
                                  (str " => " (.getName (class ex)) " user/" sym)
                                  "")
-                               "\n")))))))))
+                               "\n"))))]
+      (doto  ^java.util.logging.Handler handler
+        (.setLevel level)
+        (.setFormatter formatter))
+      (.addHandler root handler))))
 
-(def option-specs
-  [[nil "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL"]
-   [nil "--keystore-password PASSWORD" "Password to load the keystore, defaults to \"funnel\" "]
-   ["-v" "--verbose" "Increase verbosity, -vvv is the maximum."
-    :default 0
-    :update-fn inc]
-   ["-h" "--help" "Output this help information."]])
+(defn native-image? []
+  (= ["runtime" "executable"]
+     [(System/getProperty "org.graalvm.nativeimage.imagecode")
+      (System/getProperty "org.graalvm.nativeimage.kind")]))
+
+(defn option-specs []
+  (cond-> [[nil "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL."]
+           [nil "--keystore-password PASSWORD" "Password to load the keystore, defaults to \"funnel\"."]
+           ["-v" "--verbose" "Increase verbosity, -vvv is the maximum."
+            :default 0
+            :update-fn inc]
+           [nil "--logfile FILE" "Redirect logs to file. Default is stdout, or when daemonized: /tmp/funnel.log"]]
+    (native-image?)
+    (conj ["-d" "--daemonize" "Run as a background process."])
+    :->
+    (conj ["-h" "--help" "Output this help information."])))
 
 (defn print-help [summary]
   (println "Usage: funnel [OPTS]")
@@ -317,16 +341,69 @@
       (throw s)
       s)))
 
+(defn port-in-use! []
+  (println "Address already in use, is Funnel already running?")
+  (System/exit 42))
+
+(defn start-servers [opts]
+  (try
+    (start-server (ws-server opts))
+    (start-server (wss-server opts))
+    (log/info :started [(str "ws://localhost:" (:ws-port opts ws-port))
+                        (str "wss://localhost:" (:wss-port opts wss-port))])
+    (catch java.net.BindException e
+      (port-in-use!))))
+
+(defn extract-native-lib! []
+  (let [libdir (io/file (System/getProperty "java.io.tmpdir") (str "funnel-" (rand-int 9999999)))]
+    (.mkdirs libdir)
+    (doseq [libfile ["libDaemon.so"
+                     "libDaemon.dylib"
+                     #_"libDaemon.dll" ;; No windows, yet
+                     ]
+            :let [resource (io/resource libfile)]
+            :when resource]
+      (io/copy (io/input-stream resource) (io/file libdir libfile)))
+    (System/setProperty "java.library.path" (str libdir))
+    libdir))
+
+(defn check-port-in-use! [opts]
+  (try
+    (let [sock (Socket. "localhost" (long (:ws-port opts ws-port)))]
+      (.close sock)
+      (port-in-use!))
+    (catch IOException e)))
+
 (defn -main [& args]
-  (let [{:keys [options arguments summary]} (cli/parse-opts args option-specs)]
-    (init-logging (:verbose options))
+  (let [{:keys [options arguments summary]} (cli/parse-opts args (option-specs))]
+    (init-logging (:verbose options) (:logfile options
+                                               (when (:daemonize options)
+                                                 (str (io/file (System/getProperty "java.io.tmpdir") "funnel.log")))))
     (if (:help options)
       (print-help summary)
       (let [opts (assoc options :state (atom {}))]
-        (start-server (ws-server opts))
-        (start-server (wss-server opts))
-        (log/info :started [(str "ws://localhost:" (:ws-port options ws-port))
-                            (str "wss://localhost:" (:wss-port options wss-port))])))))
+        (log/trace :starting options)
+        (if (:daemonize opts)
+          (do
+            (check-port-in-use! opts)
+            (let [libdir (extract-native-lib!)
+                  pid (Daemon/daemonize)]
+              (if (= 0 pid)
+                (do
+                  (.close System/out)
+                  (.close System/err)
+                  (.close System/in)
+                  ;; Does not seem to work in the native-image build, sigh.
+                  (Signal/handle (Signal. "INT")
+                                 (reify sun.misc.SignalHandler
+                                   (handle [this signal]
+                                     (run! #(io/delete-file % true) (file-seq libdir))
+                                     (System/exit 0))))
+                  (start-servers opts))
+                (prn pid))))
+          (start-servers opts))))))
+
+
 
 (comment
 

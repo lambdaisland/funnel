@@ -67,8 +67,18 @@ warnings are displayed. You can increase the verbosity with `--verbose`/`-v`
 which can be supplied up to three times
 
 ``` shell
+./funnel -v
+./funnel -vv
 ./funnel -vvv
 ```
+
+`-v` will show opening and closing of connections but not individual messages.
+
+`-vv` is a good middle ground for when you want to see what's being sent across,
+without being inundated with implementation details
+
+`-vvv` gets really noisy, including showing things like the websocket handshake
+and raw transit.
 
 ## Specifics
 
@@ -78,6 +88,41 @@ are not allowed.
 
 To use your own certificate, provide a Java KeyStore with `--keystore FILENAME`,
 and `--keystore-password PASSWORD`.
+
+## Backgrounding
+
+Funnel provides persistence and discoverability. It keeps connections to long
+lived processes (like a browser), so that short-lived processes (like a test
+runner) can discover and interact with them . This is why we recommend running
+Funnel as a separate long-lived process, rather than for instance embedding it
+into the tool that uses it.
+
+To make this easy the native-image version allows backgrounding itself, so that
+it detaches itself from the shell that started it, and will continue running in
+the background.
+
+```
+./funnel --daemonize
+588904
+```
+
+This prints the PID of the background process and exits. Use `kill -SIGINT
+<pid>` to quit funnel.
+
+You can even invoke this from a start-up script like `.xsessionrc` or
+`.bash_profile` and forget about it. Running this multiple times is safe, if
+Funnel finds that another instance is already listening on its port then it will
+print a warning and exit with code 42.
+
+When invoked as a daemon Funnel's log output will be directed to a logfile, this
+defaults to `funnel.log` in the `java.io.tmpdir` (e.g. `/tmp/funnel.log`). Note
+that the verbosity settings still apply, so by default you won't see much in the
+logs unless errors occur. For more meaningful output supply one or more `-v`
+options.
+
+```
+./funnel --daemonize -vv --logfile ~/funnel.log
+```
 
 ## Messages
 

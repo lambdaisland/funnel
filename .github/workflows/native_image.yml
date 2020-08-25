@@ -32,7 +32,8 @@ jobs:
       - name: Build native image
         run: |
           gu install native-image
-          bin/native_image
+          make all
+          ls -l ./funnel
       - name: Rename
         run: mv ${{ env.PROJECT }} ${{ env.PROJECT }}.${{ matrix.suffix }}
       - uses: actions/upload-artifact@master

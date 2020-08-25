@@ -1,0 +1,8 @@
+[
+    {
+        "name": "lambdaisland.funnel.Daemon",
+        "methods": [
+            { "name": "daemonize", "parameterTypes": [] }
+        ]
+    }
+]

@@ -65,7 +65,6 @@ jobs:
           tag_name: ${{ github.ref }}
           release_name: ${{ github.ref }}
           body: ${{ steps.get-release-notes.outputs.changelog }}
-          draft: true
           prerelease: true
 
       - uses: actions/download-artifact@master

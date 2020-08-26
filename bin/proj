@@ -1,12 +1,37 @@
 #!bin/bb
 
-(ns proj (:require [lioss.main :as lioss]))
+(ns proj (:require [lioss.main :as lioss]
+                   [clojure.java.io :as io]
+                   [lioss.git :as git]))
+
+(defn update-version-file [{:keys [version sha date] :as opts}]
+  (with-open [f (io/writer "src/lambdaisland/funnel/version.clj")]
+    (binding [*out* f]
+      (prn '(ns lambdaisland.funnel.version))
+      (println)
+      (prn `(~'def ~'VERSION ~{:version version :date date :sha (subs sha 0 7)}))))
+  opts)
+
+(defn update-version-unreleased [opts]
+  (update-version-file (assoc opts :version "unreleased"))
+  (git/git! "add" "src/lambdaisland/funnel/version.clj")
+  (git/git! "commit" "-m" "Update version.clj post release")
+  (git/git! "push")
+  opts)
 
 (lioss/main
- {:license        :mpl
-  :inception-year 2020
-  :description    "Transit-over-WebSocket Message Relay"
-  :ci             :gh-actions})
+ {:license           :mpl
+  :inception-year    2020
+  :description       "Transit-over-WebSocket Message Relay"
+  :ci                :gh-actions
+  :pre-release-hook  update-version-file
+  :post-release-hook update-version-unreleased
+  :commands          ["update-version"
+                      {:description "update version.clj"
+                       :command     update-version-file}
+                      "update-version-unreleased"
+                      {:description "update version.clj, set version to \"unreleased\""
+                       :command     update-version-unreleased}]})
 
 
 ;; Local Variables:

@@ -5,7 +5,8 @@
             [clojure.pprint :as pprint]
             [clojure.tools.cli :as cli]
             [cognitect.transit :as transit]
-            [io.pedestal.log :as log])
+            [io.pedestal.log :as log]
+            [lambdaisland.funnel.version :as version])
   (:import (com.cognitect.transit DefaultReadHandler
                                   WriteHandler)
            (java.io ByteArrayInputStream
@@ -302,21 +303,29 @@
       (System/getProperty "org.graalvm.nativeimage.kind")]))
 
 (defn option-specs []
-  (cond-> [["-k" "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL."]
+  (cond-> [
+           ["-k" "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL."]
            [nil  "--keystore-password PASSWORD" "Password to load the keystore, defaults to \"password\"." :default "password"]
            [nil  "--ws-port PORT" "Port for the websocket server (non-SSL)" :default ws-port :parse-fn #(Integer/parseInt %)]
            [nil  "--wss-port PORT" "Port for the websocket server (SSL)" :default wss-port :parse-fn #(Integer/parseInt %)]
            ["-v" "--verbose" "Increase verbosity, -vvv is the maximum." :default 0 :update-fn inc]
+           [nil  "--version" "Print version information and exit."]
            [nil  "--logfile FILE" "Redirect logs to file. Default is stdout, or when daemonized: /tmp/funnel.log"]]
     (native-image?)
     (conj ["-d" "--daemonize" "Run as a background process."])
     :->
     (conj ["-h" "--help" "Output this help information."])))
 
+(defn print-version []
+  (let [{:keys [version date sha]} version/VERSION]
+    (println "lambdaisland/funnel" version (str "(" date " / " sha ")"))))
+
 (defn print-help [summary]
   (println "Usage: funnel [OPTS]")
   (println)
-  (println summary))
+  (println summary)
+  (println)
+  (print-version))
 
 (defn ws-server [opts]
   (let [ws-port   (:ws-port opts)
@@ -378,8 +387,18 @@
     (init-logging (:verbose options) (:logfile options
                                                (when (:daemonize options)
                                                  (str (io/file (System/getProperty "java.io.tmpdir") "funnel.log")))))
-    (if (:help options)
-      (print-help summary)
+    (cond
+      (:help options)
+      (do
+        (print-help summary)
+        (System/exit 0))
+
+      (:version options)
+      (do
+        (print-version)
+        (System/exit 0))
+
+      :else
       (let [opts (assoc options :state (atom {}))]
         (log/trace :starting options)
         (if (:daemonize opts)

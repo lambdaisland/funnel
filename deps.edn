@@ -43,4 +43,9 @@
                                   :sha "373af196d156659c78a387986b6f3b9bfd542259"
                                   :git/url "https://github.com/lambdaisland/clj.native-image"}
     org.clojure/tools.deps.alpha {:mvn/version "0.7.516"
-                                  :exclusions  [org.slf4j/slf4j-nop]}}}}}
+                                  :exclusions  [org.slf4j/slf4j-nop]}}}
+
+  :lioss
+  {:extra-deps {lambdaisland/open-source {#_#_:git/url "https://github.com/lambdaisland/open-source"
+                                          #_#_:sha "64532880f3c6430ed384304829de0fd56ad89e3e"
+                                          :local/root "../open-source"}}}}}

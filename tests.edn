@@ -1,5 +1,10 @@
 #kaocha/v1
 {:plugins [#_:kaocha.plugin/notifier
-           :kaocha.plugin/print-invocations
-           :kaocha.plugin/profiling]
+           :print-invocations
+           :profiling
+           :hooks]
+ :kaocha.hooks/pre-load [(fn [config]
+                           (require (quote clojure.java.shell))
+                           (prn ((resolve (quote clojure.java.shell/sh)) "make" "compilejava"))
+                           config)]
  :kaocha.plugin.capture-output/capture-output? false}

@@ -5,7 +5,8 @@
 (lioss/main
  {:license        :mpl
   :inception-year 2020
-  :description    "Transit-over-WebSocket Message Relay"})
+  :description    "Transit-over-WebSocket Message Relay"
+  :ci             :gh-actions})
 
 
 ;; Local Variables:

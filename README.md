@@ -3,7 +3,9 @@
 Transit-over-WebSocket Message Relay
 
 <!-- badges -->
-![](https://github.com/lambdaisland/funnel/workflows/native_image/badge.svg) [![cljdoc badge](https://cljdoc.org/badge/lambdaisland/funnel)](https://cljdoc.org/d/lambdaisland/funnel) [![Clojars Project](https://img.shields.io/clojars/v/lambdaisland/funnel.svg)](https://clojars.org/lambdaisland/funnel)
+[![Github Actions](https://github.com/lambdaisland/funnel/workflows/native_image/badge.svg)](https://github.com/lambdaisland/funnel/actions)
+[![Cljdoc Documentation](https://cljdoc.org/badge/lambdaisland/funnel)](https://cljdoc.org/d/lambdaisland/funnel)
+[![Clojars Project](https://img.shields.io/clojars/v/lambdaisland/funnel.svg)](https://clojars.org/lambdaisland/funnel)
 <!-- /badges -->
 
 ## What is it?
@@ -44,13 +46,22 @@ to a JavaScript runtime (say, a browser tab), then it has to wait for the
 browser tab to connect back. There is no way to query for existing runtimes and
 connect to them, we can only spawn a new one, and wait for it to call back.
 
-Funnel forms a bridge between developer tooling and JavaScript runtimes. It
-keeps persistent connections to runtimes so individual tools don't have to. This
-is particularly relevant when the tool's process lifetime is shorter than the
-lifetime of the JavaScript runtime.
+Funnel provides persistence and discoverability. It keeps connections to long
+lived processes (like a browser), so that short-lived processes (like a test
+runner) can discover and interact with them.
+
+In this way Funnel forms a bridge between developer tooling and JavaScript
+runtimes. It keeps persistent connections to runtimes so individual tools don't
+have to. This is particularly relevant when the tool's process lifetime is
+shorter than the lifetime of the JavaScript runtime.
 
 To make that concrete, a test runner invoked multiple times from the command
 line can run commands in the same pre-existing browser tab.
+
+Funnel accepts websocket connections on the endpoint `ws://localhost:44220`, and
+optionally `wss://localhost:44221`. Any messages it receives are forwarded to
+other clients based on active subscriptions (set up by the receiver), or based
+on a broadcast command inside the message (added by the sender).
 
 ## Installation
 
@@ -62,9 +73,21 @@ this one-liner.
 clojure -Sdeps '{:deps {lambdaisland/funnel {:mvn/version "0.1.28"}}}' -m lambdaisland.funnel --help
 ```
 
-Note that by default Funnel provides very little output, only errors and
-warnings are displayed. You can increase the verbosity with `--verbose`/`-v`
-which can be supplied up to three times
+## Usage
+
+As an end user you are generally more interested in the tools that use Funnel
+than in Funnel itself. In that the case the only thing that matters is that
+Funnel is running. You can start it once and then forget about it.
+
+```
+~/funnel
+```
+
+### Verbosity
+
+By default Funnel provides very little output, only errors and warnings are
+displayed. You can increase the verbosity with `--verbose`/`-v` which can be
+supplied up to three times
 
 ``` shell
 ./funnel -v
@@ -80,22 +103,49 @@ without being inundated with implementation details
 `-vvv` gets really noisy, including showing things like the websocket handshake
 and raw transit.
 
-## Specifics
+When debugging issues Funnel provides a great place to inspect the flow of
+messages going back and forth, which can provide useful information to
+maintainers. When reporting bugs to Funnel-based tooling it's a good idea to
+capture the traffic with
 
-Funnel listens on port 44220 (without ssl) and 44221 (with ssl). The SSL port is
-provided for when connecting from an HTTPS context where unencrypted connections
-are not allowed.
+```
+./funnel -vv --logfile funnel.log
+```
 
-To use your own certificate, provide a Java KeyStore with `--keystore FILENAME`,
-and `--keystore-password PASSWORD`.
+And share the resulting `funnel.log` file as a [gist](https://gist.github.com/).
 
-## Backgrounding
+### WSS / SSL / HTTPS
 
-Funnel provides persistence and discoverability. It keeps connections to long
-lived processes (like a browser), so that short-lived processes (like a test
-runner) can discover and interact with them . This is why we recommend running
-Funnel as a separate long-lived process, rather than for instance embedding it
-into the tool that uses it.
+By default Funnel only listens for regular, non encrypted websocket connections.
+If you are running your development server with SSL enabled (HTTPS), then your
+browser will refuse to connect to a non-encrypted websocket, and things will
+quietly fail.
+
+In this case you need to supply Funnel with a certificate in the form a `.jks`
+file (Java Key Store), so that it can listen for WSS (webocket over ssl)
+connections.
+
+```
+./funnel --keystore dev-cert.jks --keystore-password mypass123
+```
+
+If you already have a jks file that you are using for your dev setup then just
+use that. Otherwise we recommend using [Certifiable](https://github.com/bhauman/certifiable)
+to generate a certificate.
+
+The default password for Certifiable and for Funnel is `"password"`, so if you
+are using Certifiable you don't need to supply a password.
+
+```
+./funnel --keystore ~/_certifiable_certs/localhost-1d070e4/dev-server.jks
+```
+
+### Backgrounding
+
+Funnel acts as a registry for connected clients, so that clients that join later
+can query Funnel to discover who's available to talk to. This is why it's import
+to run Funnel as a separate long-lived process, rather than for instance
+embedding it into the tool that uses it.
 
 To make this easy the native-image version allows backgrounding itself, so that
 it detaches itself from the shell that started it, and will continue running in

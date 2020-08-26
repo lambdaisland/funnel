@@ -6,6 +6,7 @@
 - Added a `--logfile FILE` option to redirect output
 - Added a `--ws-port PORT` options
 - Added a `--wss-port PORT` option
+- Added a `--version` flag
 
 ## Changed
 

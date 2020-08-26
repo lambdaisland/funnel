@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>lambdaisland</groupId>
   <artifactId>funnel</artifactId>
-  <version>0.1.29</version>
+  <version>0.1.36</version>
   <name>funnel</name>
   <description>Transit-over-WebSocket Message Relay</description>
   <url>https://github.com/lambdaisland/funnel</url>
@@ -22,7 +22,7 @@
     <url>https://github.com/lambdaisland/funnel</url>
     <connection>scm:git:git://github.com/lambdaisland/funnel.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/lambdaisland/funnel.git</developerConnection>
-    <tag>5185fcaf05766678d53576cf8b0ac0f31da3d68f</tag>
+    <tag>d94f15c853796cb17d6b6f85b4f72695ce02b2f1</tag>
   </scm>
   <dependencies>
     <dependency>
@@ -68,9 +68,6 @@
         <directory>src</directory>
       </resource>
       <resource>
-        <directory>resources</directory>
-      </resource>
-      <resource>
         <directory>lib</directory>
       </resource>
     </resources>
@@ -87,7 +84,7 @@
         <configuration>
           <archive>
             <manifestEntries>
-              <git-revision>5185fcaf05766678d53576cf8b0ac0f31da3d68f</git-revision>
+              <git-revision>d94f15c853796cb17d6b6f85b4f72695ce02b2f1</git-revision>
             </manifestEntries>
           </archive>
         </configuration>

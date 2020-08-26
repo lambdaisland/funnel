@@ -1,6 +1,5 @@
 {
     "resources": [
-        {"pattern": "keystore.jks"},
         {"pattern": "libDaemon.*"}
     ]
 }

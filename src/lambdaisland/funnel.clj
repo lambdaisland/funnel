@@ -286,7 +286,7 @@
                               (intern 'user sym ex))
                           (str (.getLevel record) " ["
                                (.getLoggerName record) "] "
-                               (.getMessage record)
+                               (.formatMessage ^java.util.logging.Formatter this record)
                                (if ex
                                  (str " => " (.getName (class ex)) " user/" sym)
                                  "")
@@ -302,12 +302,12 @@
       (System/getProperty "org.graalvm.nativeimage.kind")]))
 
 (defn option-specs []
-  (cond-> [[nil "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL."]
-           [nil "--keystore-password PASSWORD" "Password to load the keystore, defaults to \"funnel\"."]
-           ["-v" "--verbose" "Increase verbosity, -vvv is the maximum."
-            :default 0
-            :update-fn inc]
-           [nil "--logfile FILE" "Redirect logs to file. Default is stdout, or when daemonized: /tmp/funnel.log"]]
+  (cond-> [["-k" "--keystore FILE" "Location of the keystore.jks file, necessary to enable SSL."]
+           [nil  "--keystore-password PASSWORD" "Password to load the keystore, defaults to \"password\"." :default "password"]
+           [nil  "--ws-port PORT" "Port for the websocket server (non-SSL)" :default ws-port :parse-fn #(Integer/parseInt %)]
+           [nil  "--wss-port PORT" "Port for the websocket server (SSL)" :default wss-port :parse-fn #(Integer/parseInt %)]
+           ["-v" "--verbose" "Increase verbosity, -vvv is the maximum." :default 0 :update-fn inc]
+           [nil  "--logfile FILE" "Redirect logs to file. Default is stdout, or when daemonized: /tmp/funnel.log"]]
     (native-image?)
     (conj ["-d" "--daemonize" "Run as a background process."])
     :->
@@ -318,49 +318,48 @@
   (println)
   (println summary))
 
-(defn ws-server [options]
-  (let [ws-port   (:ws-port options ws-port)
-        state     (:state options (atom {}))]
+(defn ws-server [opts]
+  (let [ws-port   (:ws-port opts)
+        state     (:state opts (atom {}))]
     (websocket-server {:port ws-port
                        :state state})))
 
-(defn wss-server [options]
-  (let [wss-port (:wss-port options wss-port)
-        state (:state options (atom {}))]
-    (doto (websocket-server {:port wss-port
-                             :state state})
-      (.setWebSocketFactory
-       (DefaultSSLWebSocketServerFactory.
-        (ssl-context (:keystore options (io/resource "keystore.jks"))
-                     (:keystore-password options "funnel")))))))
+(defn wss-server [{:keys [keystore keystore-password wss-port] :as opts}]
+  (when (and keystore keystore-password)
+    (let [state (:state opts (atom {}))]
+      (doto (websocket-server {:port wss-port :state state})
+        (.setWebSocketFactory
+         (DefaultSSLWebSocketServerFactory.
+          (ssl-context keystore keystore-password)))))))
 
 (defn start-server [server]
-  (.start ^WebSocketServer server)
-  (let [s @server]
-    (if (instance? Throwable s)
-      (throw s)
-      s)))
+  (when server
+    (.start ^WebSocketServer server)
+    (let [s @server]
+      (if (instance? Throwable s)
+        (throw s)
+        s))))
 
 (defn port-in-use! []
   (println "Address already in use, is Funnel already running?")
   (System/exit 42))
 
-(defn start-servers [opts]
+(defn start-servers [{:keys [ws-port wss-port] :as opts}]
   (try
-    (start-server (ws-server opts))
-    (start-server (wss-server opts))
-    (log/info :started [(str "ws://localhost:" (:ws-port opts ws-port))
-                        (str "wss://localhost:" (:wss-port opts wss-port))])
+    (let [ws (ws-server opts)
+          wss (wss-server opts)]
+      (start-server ws)
+      (start-server wss)
+      (log/info :started (cond-> [(str "ws://localhost:" ws-port)]
+                           wss
+                           (conj (str "wss://localhost:" wss-port)))))
     (catch java.net.BindException e
       (port-in-use!))))
 
 (defn extract-native-lib! []
   (let [libdir (io/file (System/getProperty "java.io.tmpdir") (str "funnel-" (rand-int 9999999)))]
     (.mkdirs libdir)
-    (doseq [libfile ["libDaemon.so"
-                     "libDaemon.dylib"
-                     #_"libDaemon.dll" ;; No windows, yet
-                     ]
+    (doseq [libfile ["libDaemon.so" "libDaemon.dylib"]
             :let [resource (io/resource libfile)]
             :when resource]
       (io/copy (io/input-stream resource) (io/file libdir libfile)))

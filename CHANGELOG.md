@@ -1,16 +1,26 @@
-# 0.1.28 (2020-08-25 / be69644)
+# Unreleased
 
 ## Added
 
-## Fixed
+- Added a `--daemonize` flag so Funnel can background itself (experimental)
+- Added a `--logfile FILE` option to redirect output
+- Added a `--ws-port PORT` options
+- Added a `--wss-port PORT` option
 
 ## Changed
 
-# 0.1.25 (2020-08-24 / 77ac3a2)
+- No longer include a default certificate
+- Only start WSS server when a certificate is provided
+- Changed the default `--keystore-password` from `"funnel"` to `"password"`
+  (same as [bhauman/certifiable](https://github.com/bhauman/certifiable))
 
 ## Fixed
 
-- Use a certificate with SAN=dns:localhost, so browsers accept it automatically.
+- Correctly format log messages that contain parameters (like jdk.event.security)
+
+# 0.1.25 (2020-08-24 / 77ac3a2)
+
+Retracted.
 
 # 0.1.16 (2020-05-26 / 81b2e61)
 

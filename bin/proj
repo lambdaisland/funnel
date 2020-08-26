@@ -22,7 +22,7 @@
 (lioss/main
  {:license           :mpl
   :inception-year    2020
-  :description       "Transit-over-WebSocket Message Relay"
+  :description       "Transit-over-WebSocket Message Hub"
   :ci                :gh-actions
   :pre-release-hook  update-version-file
   :post-release-hook update-version-unreleased

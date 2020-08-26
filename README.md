@@ -1,6 +1,6 @@
 # Funnel
 
-Transit-over-WebSocket Message Relay
+Transit-over-WebSocket Message Hub
 
 <!-- badges -->
 [![Github Actions](https://github.com/lambdaisland/funnel/workflows/native_image/badge.svg)](https://github.com/lambdaisland/funnel/actions)
@@ -10,11 +10,11 @@ Transit-over-WebSocket Message Relay
 
 ## What is it?
 
-Funnel is a WebSocket message relay. It accepts connections from multiple
-clients, and then acts as a go-between, funneling messages between them, with
-flexible mechanisms for setting up message routing, either by the sender
-(broadcast) or receiver (subscribe). It also provides discoverability, so
-clients can find out who is there to talk to.
+Funnel is a WebSocket message hub. It accepts connections from multiple clients,
+and then acts as a go-between, funneling messages between them, with flexible
+mechanisms for setting up message routing, either by the sender (broadcast) or
+receiver (subscribe). It also provides discoverability, so clients can find out
+who is there to talk to.
 
 <!-- opencollective -->
 

@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+# Wrapper script for funnel to be dropped into projects, will run `funnel` from
+# the PATH if it exists, or otherwise download it and store it inside the
+# project. When using the system `funnel` it will do a version check and warn if
+# the version is older than what is requested.
+
+funnel_version="0.1.42"
+store_dir="$(pwd)/.store"
+install_dir="${store_dir}/funnel-${funnel_version}"
+
+system_funnel="$(which funnel)"
+set -e
+
+# https://stackoverflow.com/questions/4023830/how-to-compare-two-strings-in-dot-separated-version-format-in-bash
+vercomp () {
+    if [[ $1 == $2 ]]
+    then
+        return 0
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+    do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++))
+    do
+        if [[ -z ${ver2[i]} ]]
+        then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]}))
+        then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]}))
+        then
+            return 2
+        fi
+    done
+    return 0
+}
+
+if [[ -f "$system_funnel" ]]; then
+    funnel_path="$system_funnel"
+elif [[ -f "$install_dir/funnel" ]]; then
+    funnel_path="$install_dir/funnel"
+else
+    case "$(uname -s)" in
+        Linux*)  platform=linux;;
+        Darwin*) platform=darwin;;
+    esac
+
+    echo "$name $funnel_version not found, installing to $install_dir..."
+    download_url="https://github.com/lambdaisland/funnel/releases/download/v$funnel_version/funnel.$platform-amd64"
+
+    mkdir -p $install_dir
+    funnel_path="$install_dir/funnel"
+    echo -e "Downloading $download_url."
+    curl -o "$funnel_path" -sL "$download_url"
+    chmod +x "$funnel_path"
+fi
+
+set +e
+actual_version="$($funnel_path --version | sed 's^lambdaisland/funnel ^^' | sed 's^ .*^^')"
+
+vercomp $actual_version $funnel_version
+case $? in
+     0) ;;  # =
+     1) ;;  # >
+     2) echo "WARNING: funnel version is $actual_version, expected $funnel_version" ;;  # <
+esac
+set -e
+
+exec "$funnel_path" "$@"

@@ -349,6 +349,17 @@ communication with Funnel.
 echo '{:funnel/query true}' | jet --to transit | websocat ws://localhost:44220 | jet --from transit
 ```
 
+## Building Funnel-based Tooling
+
+Working with Funnel is fairly straightforward, all you need is a websocket
+client and the ability to encode/decode transit. A typical usage pattern is to
+send a `:funnel/whoami` message in the websocket `onOpen` hook so you become
+visible to other clients.
+
+For Clojure and ClojureScript there's
+[funnel-client](https://github.com/lambdaisland/funnel-client), which further
+reduces the boilerplate and which implements this whoami-in-onopen pattern.
+
 ## Prior Art
 
 The design of Funnel is influenced by shadow-cljs's `shadow.remote`.

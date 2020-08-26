@@ -2,7 +2,8 @@
 
 (ns proj (:require [lioss.main :as lioss]
                    [clojure.java.io :as io]
-                   [lioss.git :as git]))
+                   [lioss.git :as git]
+                   [clojure.string :as str]))
 
 (defn update-version-file [{:keys [version sha date] :as opts}]
   (with-open [f (io/writer "src/lambdaisland/funnel/version.clj")]
@@ -10,6 +11,12 @@
       (prn '(ns lambdaisland.funnel.version))
       (println)
       (prn `(~'def ~'VERSION ~{:version version :date date :sha (subs sha 0 7)}))))
+
+  (spit "bin/funnel_wrapper"
+        (str/replace (slurp "bin/funnel_wrapper")
+                     #"funnel_version=\".*\""
+                     (str "funnel_version=" (pr-str version))))
+
   opts)
 
 (defn update-version-unreleased [opts]

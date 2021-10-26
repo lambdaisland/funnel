@@ -34,9 +34,9 @@
   true."
   [expected]
   `(loop [i# 0]
-     (if (and (not ~expected) (< i# 10))
+     (if (and (not ~expected) (< i# 30))
        (do
-         (Thread/sleep 10)
+         (Thread/sleep 25)
          (recur (inc i#)))
        (t/is ~expected))))
 

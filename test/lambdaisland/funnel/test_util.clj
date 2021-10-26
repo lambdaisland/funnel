@@ -44,7 +44,7 @@
   "Pure predicate version of matcher-combinators, otherwise using (will (match?))
   will break."
   [expected actual]
-  (mc/match? (mc/match expected actual)))
+  (mc/indicates-match? (mc/match expected actual)))
 
 (defn test-client []
   (let [history (atom [])

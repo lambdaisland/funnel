@@ -1,14 +1,17 @@
 version: 2.1
 
 orbs:
-  kaocha: lambdaisland/kaocha@dev:first
-  clojure: lambdaisland/clojure@dev:first
+  kaocha: lambdaisland/kaocha@0.0.3
+  clojure: lambdaisland/clojure@0.0.7
 
-commands:
-  checkout_and_run:
+jobs:
+  run-kaocha:
     parameters:
+      os:
+        type: executor
       clojure_version:
         type: string
+    executor: << parameters.os >>
     steps:
       - checkout
       - clojure/with_cache:
@@ -19,37 +22,11 @@ commands:
                 clojure_version: << parameters.clojure_version >>
       - kaocha/upload_codecov
 
-jobs:
-  java-11-clojure-1_10:
-    executor: clojure/openjdk11
-    steps: [{checkout_and_run: {clojure_version: "1.10.0-RC5"}}]
-
-  java-11-clojure-1_9:
-    executor: clojure/openjdk11
-    steps: [{checkout_and_run: {clojure_version: "1.9.0"}}]
-
-  java-9-clojure-1_10:
-    executor: clojure/openjdk9
-    steps: [{checkout_and_run: {clojure_version: "1.10.0-RC5"}}]
-
-  java-9-clojure-1_9:
-    executor: clojure/openjdk9
-    steps: [{checkout_and_run: {clojure_version: "1.9.0"}}]
-
-  java-8-clojure-1_10:
-    executor: clojure/openjdk8
-    steps: [{checkout_and_run: {clojure_version: "1.10.0-RC5"}}]
-
-  java-8-clojure-1_9:
-    executor: clojure/openjdk8
-    steps: [{checkout_and_run: {clojure_version: "1.9.0"}}]
-
 workflows:
-  kaocha_test:
+  kaocha-test:
     jobs:
-      - java-11-clojure-1_10
-      - java-11-clojure-1_9
-      - java-9-clojure-1_10
-      - java-9-clojure-1_9
-      - java-8-clojure-1_10
-      - java-8-clojure-1_9
+      - run-kaocha:
+          matrix:
+            parameters:
+              os: [clojure/openjdk17, clojure/openjdk16, clojure/openjdk15, clojure/openjdk11, clojure/openjdk8]
+              clojure_version: ["1.9.0", "1.10.3"]

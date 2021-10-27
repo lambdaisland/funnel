@@ -7,7 +7,7 @@ on:
       - '*'
 
 env:
-  CLOJURE_CLI_VERSION: '1.10.1.536'
+  CLOJURE_CLI_VERSION: '1.10.3.943'
   GRAALVM_VERSION: '19.3.1.java11'
   PROJECT: funnel
 

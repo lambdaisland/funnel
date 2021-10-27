@@ -52,6 +52,11 @@ jobs:
         with:
           tools-deps: ${{ env.CLOJURE_CLI_VERSION }}
 
+      - name: Setup Babashka
+        uses: turtlequeue/setup-babashka@v1.3.0
+        with:
+          babashka-version: 0.6.2
+
       - name: Get release notes
         id: get-release-notes
         run: |

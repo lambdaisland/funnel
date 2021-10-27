@@ -48,12 +48,13 @@
            :foo :bar})
       (c3 {:funnel/whoami {:id 3}})
       (c2 {:foo :baz})
-      (will (= @(:history c1) [{:funnel/whoami {:id 2}
-                                :foo :bar}
-                               {:funnel/whoami {:id 2}
-                                :foo :baz}]))
-      (will (= @(:history c2) []))
-      (will (= @(:history c3) [])))))
+      (will (= [{:funnel/whoami {:id 2}
+                 :foo :bar}
+                {:funnel/whoami {:id 2}
+                 :foo :baz}]
+               @(:history c1)))
+      (will (= [] @(:history c2)))
+      (will (= [] @(:history c3))))))
 
 (deftest unsubscribe-test
   (let [state (atom {})]

@@ -16,27 +16,6 @@ mechanisms for setting up message routing, either by the sender (broadcast) or
 receiver (subscribe). It also provides discoverability, so clients can find out
 who is there to talk to.
 
-<!-- opencollective -->
-
-&nbsp;
-
-<img align="left" src="https://github.com/lambdaisland/open-source/raw/master/artwork/lighthouse_readme.png">
-
-&nbsp;
-
-## Support Lambda Island Open Source
-
-funnel is part of a growing collection of quality Clojure libraries and
-tools released on the Lambda Island label. If you are using this project
-commercially then you are expected to pay it forward by
-[becoming a backer on Open Collective](http://opencollective.com/lambda-island#section-contribute),
-so that we may continue to enjoy a thriving Clojure ecosystem.
-
-&nbsp;
-
-&nbsp;
-
-<!-- /opencollective -->
 
 ## What is it for?
 
@@ -396,10 +375,32 @@ we may still consider making breaking changes, if there is consensus that the
 changes are justified.
 <!-- /contributing -->
 
+<!-- opencollective -->
+
+&nbsp;
+
+<img align="left" src="https://github.com/lambdaisland/open-source/raw/master/artwork/lighthouse_readme.png">
+
+&nbsp;
+
+## Support Lambda Island Open Source
+
+funnel is part of a growing collection of quality Clojure libraries and
+tools released on the Lambda Island label. If you are using this project
+commercially then you are expected to pay it forward by
+[becoming a backer on Open Collective](http://opencollective.com/lambda-island#section-contribute),
+so that we may continue to enjoy a thriving Clojure ecosystem.
+
+&nbsp;
+
+&nbsp;
+
+<!-- /opencollective -->
+
 <!-- license -->
 ## License
 
-Copyright &copy; 2020 Arne Brasseur and Contributors
+Copyright &copy; 2020-2021 Arne Brasseur and Contributors
 
 Licensed under the term of the Mozilla Public License 2.0, see LICENSE.
 <!-- /license -->

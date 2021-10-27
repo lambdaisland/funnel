@@ -34,9 +34,9 @@
   true."
   [expected]
   `(loop [i# 0]
-     (if (and (not ~expected) (< i# 10))
+     (if (and (not ~expected) (< i# 30))
        (do
-         (Thread/sleep 10)
+         (Thread/sleep 25)
          (recur (inc i#)))
        (t/is ~expected))))
 
@@ -44,7 +44,7 @@
   "Pure predicate version of matcher-combinators, otherwise using (will (match?))
   will break."
   [expected actual]
-  (mc/match? (mc/match expected actual)))
+  (mc/indicates-match? (mc/match expected actual)))
 
 (defn test-client []
   (let [history (atom [])

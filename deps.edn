@@ -20,7 +20,7 @@
   {:main-opts ["-m" "lambdaisland.funnel"]}
 
   :native-image
-  {:main-opts ["-m clj.native-image lambdaisland.funnel"
+  {:main-opts ["-m" "clj.native-image" "lambdaisland.funnel"
                "--echo"
                "--"
                "--initialize-at-build-time"

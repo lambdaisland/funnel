@@ -1,3 +1,3 @@
 (ns lambdaisland.funnel.version)
 
-(def VERSION {:date "2020-08-26", :version "unreleased", :sha "6f0139b"})
+(def VERSION {:version "0.1.61", :date "2021-12-16", :sha "021e62d"})

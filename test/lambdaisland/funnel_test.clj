@@ -38,23 +38,29 @@
 
 (deftest subscribe-test
   (testing "messages get forwarded to subscriber"
-    (with-open [_ (test-server)
-                c1 (test-client)
-                c2 (test-client)
-                c3 (test-client)]
-      (c1 {:funnel/whoami {:id 1}
-           :funnel/subscribe [:id 2]})
-      (c2 {:funnel/whoami {:id 2}
-           :foo :bar})
-      (c3 {:funnel/whoami {:id 3}})
-      (c2 {:foo :baz})
-      (will (= [{:funnel/whoami {:id 2}
-                 :foo :bar}
-                {:funnel/whoami {:id 2}
-                 :foo :baz}]
-               @(:history c1)))
-      (will (= [] @(:history c2)))
-      (will (= [] @(:history c3))))))
+    (let [state (atom {})]
+      (with-open [_ (test-server state)
+                  c1 (test-client)
+                  c2 (test-client)
+                  c3 (test-client)]
+        (c1 {:funnel/whoami {:id 1}
+             :funnel/subscribe [:id 2]})
+        ;; Checkpoint to prevent race conditions, we only continue when funnel
+        ;; has registered the subscription.
+        (will (= [{:whoami {:id 1}, :subscriptions #{[:id 2]}}]
+                 (vals @state)))
+
+        (c2 {:funnel/whoami {:id 2}
+             :foo :bar})
+        (c3 {:funnel/whoami {:id 3}})
+        (c2 {:foo :baz})
+        (will (= [{:funnel/whoami {:id 2}
+                   :foo :bar}
+                  {:funnel/whoami {:id 2}
+                   :foo :baz}]
+                 @(:history c1)))
+        (will (= [] @(:history c2)))
+        (will (= [] @(:history c3)))))))
 
 (deftest unsubscribe-test
   (let [state (atom {})]
@@ -94,34 +100,36 @@
     (is (= [:ws3] (funnel/destinations :ws1 [:id :ws3] state)))))
 
 (deftest query-test
-  (with-open [s (test-server)
-              c1 (test-client)
-              c2 (test-client)
-              c3 (test-client)]
-    (c1 {:funnel/query true})
-    (will (= [{:funnel/clients []}] @(:history c1)))
+  (let [state (atom {})]
+    (with-open [s (test-server state)
+                c1 (test-client)
+                c2 (test-client)
+                c3 (test-client)]
+      (c1 {:funnel/query true})
+      (will (= [{:funnel/clients []}] @(:history c1)))
 
-    (c1 {:funnel/whoami {:id 123 :type :x}})
-    (c2 {:funnel/whoami {:id 456 :type :x}})
-    (c3 {:funnel/whoami {:id 789 :type :y}})
+      (c1 {:funnel/whoami {:id 123 :type :x}})
+      (c2 {:funnel/whoami {:id 456 :type :x}})
+      (c3 {:funnel/whoami {:id 789 :type :y}})
+      (will (= 3 (count @state)))
 
-    (reset! (:history c1) [])
-    (c1 {:funnel/query true})
-    (will (match? [{:funnel/clients
-                    (m/in-any-order [{:id 456 :type :x}
-                                     {:id 789 :type :y}])}]
-                  @(:history c1)))
+      (reset! (:history c1) [])
+      (c1 {:funnel/query true})
+      (will (match? [{:funnel/clients
+                      (m/in-any-order [{:id 456 :type :x}
+                                       {:id 789 :type :y}])}]
+                    @(:history c1)))
 
-    (c2 {:funnel/query [:id 789]})
-    (will (= [{:funnel/clients
-               [{:id 789 :type :y}]}]
-             @(:history c2)))
+      (c2 {:funnel/query [:id 789]})
+      (will (= [{:funnel/clients
+                 [{:id 789 :type :y}]}]
+               @(:history c2)))
 
-    (c3 {:funnel/query [:type :x]})
-    (will (match? [{:funnel/clients
-                    (m/in-any-order [{:id 123 :type :x}
-                                     {:id 456 :type :x}])}]
-                  @(:history c3))))
+      (c3 {:funnel/query [:type :x]})
+      (will (match? [{:funnel/clients
+                      (m/in-any-order [{:id 123 :type :x}
+                                       {:id 456 :type :x}])}]
+                    @(:history c3)))))
 
   (testing "map queries"
     (with-open [s (test-server)

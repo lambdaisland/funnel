@@ -50,7 +50,7 @@ JVM_INCLUDE=-I${JAVA_HOME}/include -I${JAVA_HOME}/include/$(ARCH) \
 all: compilejava compilec nativeimage
 
 compilejava:
-	$(JAVA_HOME)/bin/javac -h src_jni src/lambdaisland/funnel/Daemon.java
+	$(JAVA_HOME)/bin/javac --release 8 -h src_jni src/lambdaisland/funnel/Daemon.java
 
 compilec:
 	mkdir -p lib

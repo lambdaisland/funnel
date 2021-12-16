@@ -132,18 +132,20 @@
                     @(:history c3)))))
 
   (testing "map queries"
-    (with-open [s (test-server)
-                c1 (test-client)
-                c2 (test-client)
-                c3 (test-client)]
-      (c1 {:funnel/whoami {:id 123 :type :x :subtype :a}})
-      (c2 {:funnel/whoami {:id 456 :type :x :subtype :b}})
-      (c3 {:funnel/whoami {:id 789 :type :y :subtype :b}})
+    (let [state (atom {})]
+      (with-open [s (test-server state)
+                  c1 (test-client)
+                  c2 (test-client)
+                  c3 (test-client)]
+        (c1 {:funnel/whoami {:id 123 :type :x :subtype :a}})
+        (c2 {:funnel/whoami {:id 456 :type :x :subtype :b}})
+        (c3 {:funnel/whoami {:id 789 :type :y :subtype :b}})
+        (will (= 3 (count @state)))
 
-      (c1 {:funnel/query {:type :x :subtype :b}})
-      (will (= [{:funnel/clients
-                 [{:id 456 :type :x :subtype :b}]}]
-               @(:history c1))))))
+        (c1 {:funnel/query {:type :x :subtype :b}})
+        (will (= [{:funnel/clients
+                   [{:id 456 :type :x :subtype :b}]}]
+                 @(:history c1)))))))
 
 
 

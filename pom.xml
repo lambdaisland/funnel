@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>lambdaisland</groupId>
   <artifactId>funnel</artifactId>
-  <version>0.1.61</version>
+  <version>1.4.64</version>
   <name>funnel</name>
   <description>Transit-over-WebSocket Message Hub</description>
   <url>https://github.com/lambdaisland/funnel</url>
@@ -12,6 +12,9 @@
     <name>Lambda Island</name>
     <url>https://lambdaisland.com</url>
   </organization>
+  <properties>
+    <project class="build sourceEncoding">UTF-8</project>
+  </properties>
   <licenses>
     <license>
       <name>MPL-2.0</name>
@@ -22,7 +25,7 @@
     <url>https://github.com/lambdaisland/funnel</url>
     <connection>scm:git:git://github.com/lambdaisland/funnel.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/lambdaisland/funnel.git</developerConnection>
-    <tag>62874c8eb703da98c557e9b518ca8a7ec018a1f8</tag>
+    <tag>4d73eef0542b5e18dbc2b3bb2ef65f1aff545a4d</tag>
   </scm>
   <dependencies>
     <dependency>
@@ -76,6 +79,10 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.8.1</version>
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -84,7 +91,7 @@
         <configuration>
           <archive>
             <manifestEntries>
-              <git-revision>62874c8eb703da98c557e9b518ca8a7ec018a1f8</git-revision>
+              <git-revision>4d73eef0542b5e18dbc2b3bb2ef65f1aff545a4d</git-revision>
             </manifestEntries>
           </archive>
         </configuration>

@@ -36,7 +36,7 @@
   `(loop [i# 0]
      (if (and (not ~expected) (< i# 30))
        (do
-         (Thread/sleep 25)
+         (Thread/sleep 50)
          (recur (inc i#)))
        (t/is ~expected))))
 

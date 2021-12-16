@@ -34,7 +34,7 @@
   true."
   [expected]
   `(loop [i# 0]
-     (if (and (not ~expected) (< i# 100))
+     (if (and (not ~expected) (< i# 30))
        (do
          (Thread/sleep 50)
          (recur (inc i#)))
@@ -72,5 +72,4 @@
     (doto (->  {:ws-port *port*
                 :state state-atom}
                funnel/ws-server)
-
       (.setTcpNoDelay true)))))

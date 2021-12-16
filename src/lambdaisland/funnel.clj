@@ -269,7 +269,7 @@
 
 (defn init-logging [level logfile]
   (let [root  (java.util.logging.Logger/getLogger "")
-        level (case (long  level)
+        level (case (long level)
                 0 java.util.logging.Level/WARNING
                 1 java.util.logging.Level/INFO
                 2 java.util.logging.Level/FINE

@@ -5,7 +5,7 @@
 # project. When using the system `funnel` it will do a version check and warn if
 # the version is older than what is requested.
 
-funnel_version="0.1.61"
+funnel_version="1.4.71"
 store_dir="$(pwd)/.store"
 install_dir="${store_dir}/funnel-${funnel_version}"
 

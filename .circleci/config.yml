@@ -29,4 +29,4 @@ workflows:
           matrix:
             parameters:
               os: [clojure/openjdk17, clojure/openjdk16, clojure/openjdk15, clojure/openjdk11]
-              clojure_version: ["1.9.0", "1.10.3"]
+              clojure_version: ["1.9.0", "1.10.3", "1.11.1"]

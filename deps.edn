@@ -1,20 +1,19 @@
 {:paths ["src" "lib"]
 
  :deps
- {org.clojure/clojure               {:mvn/version "1.10.3"}
-  org.java-websocket/Java-WebSocket {:mvn/version "1.5.2"}
-  org.clojure/tools.cli             {:mvn/version "1.0.206"}
-  io.pedestal/pedestal.log          {:mvn/version "0.5.9"}
-  org.slf4j/slf4j-jdk14             {:mvn/version "1.7.32"}
-  org.clojure/core.async            {:mvn/version "1.5.648"}
-  com.cognitect/transit-clj         {:mvn/version "1.0.324"
-                                     :exclusions  [org.msgpack/msgpack]}}
+ {org.java-websocket/Java-WebSocket {:mvn/version "1.6.0"}
+  org.clojure/tools.cli             {:mvn/version "1.1.230"}
+  org.slf4j/slf4j-jdk14             {:mvn/version "2.0.17"}
+  org.clojure/core.async            {:mvn/version "1.7.701"}
+  com.cognitect/transit-clj         {:mvn/version "1.0.333"
+                                     :exclusions  [org.msgpack/msgpack]}
+  com.cnuernber/charred             {:mvn/version "1.036"}}
 
  :aliases
  {:test
   {:extra-paths ["test"]
-   :extra-deps  {lambdaisland/kaocha        {:mvn/version "1.60.945"}
-                 nubank/matcher-combinators {:mvn/version "3.3.1"}}}
+   :extra-deps  {lambdaisland/kaocha        {:mvn/version "1.91.1392"}
+                 nubank/matcher-combinators {:mvn/version "3.9.1"}}}
 
   :main
   {:main-opts ["-m" "lambdaisland.funnel"]}
@@ -27,7 +26,7 @@
                "--initialize-at-run-time=lambdaisland.funnel.Daemon"
                "--no-fallback"
                "--enable-https"
-               "--allow-incomplete-classpath"
+               "-H:+UnlockExperimentalVMOptions"
                "-H:Name=funnel"
                "-H:Log=registerResource"
                "-H:ResourceConfigurationFiles=resource-config.json"
@@ -36,10 +35,10 @@
                "-Djava.library.path=lib"
                "-H:JNIConfigurationFiles=graal_jni.json"
                "-H:+ReportExceptionStackTraces"
+               "--trace-object-instantiation=com.sun.jmx.mbeanserver.JmxMBeanServer"
                #_"--report-unsupported-elements-at-runtime"]
    :jvm-opts  ["-Dclojure.compiler.direct-linking=true"]
    :extra-deps
-   {com.lambdaisland/clj.native-image {:git/sha "373af196d156659c78a387986b6f3b9bfd542259"
+   {com.lambdaisland/clj.native-image {:git/sha "836d24a92705f2ff556709ec40ea26a0d5c8dffa"
                                        :git/url "https://github.com/lambdaisland/clj.native-image"}
-    org.clojure/tools.deps.alpha {:mvn/version "0.7.516"
-                                  :exclusions  [org.slf4j/slf4j-nop]}}}}}
+    }}}}

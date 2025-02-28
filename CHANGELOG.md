@@ -2,17 +2,16 @@
 
 ## Added
 
-## Fixed
+- Support multiple formats, add `/?content-type=json|edn|transit` to the
+  websocket URL. Still defaults to transit.
 
 ## Changed
+
+- Remove pedestal.log
 
 # 1.4.71 (2021-12-16 / 6ae91b0)
 
-## Added
-
-## Fixed
-
-## Changed
+- Testing, tooling, docs updates
 
 # 0.1.42 (2020-08-26 / 4c14cec)
 

@@ -1,38 +1,42 @@
 (ns lambdaisland.funnel
   (:gen-class)
-  (:require [clojure.core.async :as async]
-            [clojure.java.io :as io]
-            [clojure.pprint :as pprint]
-            [clojure.tools.cli :as cli]
-            [cognitect.transit :as transit]
-            [io.pedestal.log :as log]
-            [lambdaisland.funnel.version :as version])
-  (:import (com.cognitect.transit DefaultReadHandler
-                                  WriteHandler)
-           (java.io ByteArrayInputStream
-                    ByteArrayOutputStream
-                    FileInputStream
-                    FileOutputStream
-                    PrintStream
-                    IOException)
-           (java.net InetSocketAddress Socket)
-           (java.nio ByteBuffer)
-           (java.nio.file Files Path Paths)
-           (java.security KeyStore)
-           (java.util Comparator)
-           (javax.net.ssl SSLContext
-                          KeyManagerFactory)
-           (lambdaisland.funnel Daemon)
-           (org.java_websocket WebSocket
-                               WebSocketAdapter
-                               WebSocketImpl)
-           (org.java_websocket.drafts Draft_6455)
-           (org.java_websocket.handshake Handshakedata)
-           (org.java_websocket.handshake ClientHandshake)
-           (org.java_websocket.server DefaultWebSocketServerFactory
-                                      DefaultSSLWebSocketServerFactory
-                                      WebSocketServer)
-           (sun.misc Signal)))
+  (:require
+   [clojure.core.async :as async]
+   [clojure.edn :as edn]
+   [clojure.java.io :as io]
+   [clojure.pprint :as pprint]
+   [clojure.tools.cli :as cli]
+   [cognitect.transit :as transit]
+   [charred.api :as charred]
+   [lambdaisland.funnel.log :as log]
+   [lambdaisland.funnel.version :as version])
+  (:import
+   (com.cognitect.transit DefaultReadHandler
+                          WriteHandler)
+   (java.io ByteArrayInputStream
+            ByteArrayOutputStream
+            FileInputStream
+            FileOutputStream
+            PrintStream
+            IOException)
+   (java.net InetSocketAddress Socket)
+   (java.nio ByteBuffer)
+   (java.nio.file Files Path Paths)
+   (java.security KeyStore)
+   (java.util Comparator)
+   (javax.net.ssl SSLContext
+                  KeyManagerFactory)
+   (lambdaisland.funnel Daemon)
+   (org.java_websocket WebSocket
+                       WebSocketAdapter
+                       WebSocketImpl)
+   (org.java_websocket.drafts Draft_6455)
+   (org.java_websocket.handshake Handshakedata)
+   (org.java_websocket.handshake ClientHandshake)
+   (org.java_websocket.server DefaultWebSocketServerFactory
+                              DefaultSSLWebSocketServerFactory
+                              WebSocketServer)
+   (sun.misc Signal)))
 
 (set! *warn-on-reflection* true)
 
@@ -71,7 +75,10 @@
   (when (and (vector? e) (= ::error (first e)))
     (second e)))
 
-(defn to-transit [value]
+(defmulti encode (fn [format value] format))
+(defmulti decode (fn [format value] format))
+
+(defmethod encode :transit [_ value]
   (try
     (let [out (ByteArrayOutputStream. 4096)
           writer (transit/writer out :json {:handlers {TaggedValue tagged-write-handler}})]
@@ -80,13 +87,25 @@
     (catch Exception e
       [::error e])))
 
-(defn from-transit [^String transit]
+(defmethod decode :transit [_ ^String transit]
   (try
     (let [in (ByteArrayInputStream. (.getBytes transit))
           reader (transit/reader in :json {:default-handler tagged-read-handler})]
       (transit/read reader))
     (catch Exception e
       [::error e])))
+
+(defmethod encode :edn [_ value]
+  (pr-str value))
+
+(defmethod decode :edn [_ ^String edn]
+  (edn/read-string edn))
+
+(defmethod encode :json [_ value]
+  (charred/write-json-str value))
+
+(defmethod decode :json [_ ^String json]
+  (charred/read-json json :key-fn keyword))
 
 (defn match-selector? [whoami selector]
   (cond
@@ -113,21 +132,17 @@
   (.getAttachment conn))
 
 (defn handle-query [conn selector conns]
-  (let [msg (to-transit
-             {:funnel/clients
-              (map (comp :whoami val)
-                   (filter
-                    (fn [[c m]]
-                      (and (match-selector? (:whoami m) selector)
-                           (not= c conn)))
-                    conns))})]
-    (if-let [e (maybe-error msg)]
-      (log/error :query-encoding-failed {:selector selector :conns (vals conns)} :exception e)
-      (async/>!! (outbox conn) msg))))
+  (let [msg {:funnel/clients
+             (map (comp :whoami val)
+                  (filter
+                   (fn [[c m]]
+                     (and (match-selector? (:whoami m) selector)
+                          (not= c conn)))
+                   conns))}]
+    (async/>!! (outbox conn) msg)))
 
 (defn handle-message [state ^WebSocket conn raw-msg]
-  (let [msg (from-transit raw-msg)
-        inbox (:inbox (.getAttachment conn))]
+  (let [msg (decode (get-in @state [conn :format]) raw-msg)]
     (when-let [e (maybe-error msg)]
       (log/warn :message-decoding-failed {:raw-msg raw-msg :desc "Raw message will be forwarded"} :exception e))
     (let [[msg broadcast]
@@ -146,10 +161,9 @@
               (when-let [selector (:funnel/query msg)]
                 (handle-query conn selector @state))
 
-              [(to-transit
-                (if-let [whomai (:whoami (get @state conn))]
-                  (assoc msg :funnel/whoami whomai)
-                  msg))
+              [(if-let [whomai (:whoami (get @state conn))]
+                 (assoc msg :funnel/whoami whomai)
+                 msg)
                (:funnel/broadcast msg)]))]
       (if-let [e (maybe-error msg)]
         (log/error :message-encoding-failed {:msg msg} :exception e)
@@ -162,8 +176,15 @@
 
 (defn handle-open [state ^WebSocket conn handshake]
   (log/info :connection-opened {:remote-socket-address (.getRemoteSocketAddress conn)})
-  (let [outbox (async/chan 8 #_(map #(doto % prn)))]
+  (let [path (.getResourceDescriptor conn)
+        format (case path
+                 "/?content-type=json" :json
+                 "/?content-type=edn" :edn
+                 "/?content-type=transit" :transit
+                 :transit)
+        outbox (async/chan 8 (map (partial encode format)))]
     (.setAttachment conn outbox)
+    (swap! state assoc-in [conn :format] format)
     (async/go-loop []
       (when-let [^String msg (async/<! outbox)]
         (when (.isOpen conn)
@@ -430,4 +451,6 @@
   (intern 'user 'foo 123)
 
   (log/error :foo :bar :exception (Exception. "123"))
+
+  (start-servers {:ws-port 2234 :wss-port 2235})
   )

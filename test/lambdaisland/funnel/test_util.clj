@@ -54,7 +54,7 @@
                    (deliver connected? true))
                  (onClose [code reason remote?])
                  (onMessage [message]
-                   (swap! history conj (funnel/from-transit message)))
+                   (swap! history conj (funnel/decode :transit message)))
                  (onError [ex]
                    (println ex)
                    ))]

@@ -1,3 +1,11 @@
+# Unreleased
+
+## Added
+
+## Fixed
+
+## Changed
+
 # 1.6.93 (2025-02-28 / be9c357)
 
 ## Fixed

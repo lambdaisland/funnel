@@ -23,9 +23,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - uses: DeLaGuardo/setup-graalvm@5.0
+      - uses: graalvm/setup-graalvm@v1
         with:
-          graalvm-version: ${{ env.GRAALVM_VERSION }}
+          java-version: '25'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: DeLaGuardo/setup-clojure@3.5
         with:
           tools-deps: ${{ env.CLOJURE_CLI_VERSION }}

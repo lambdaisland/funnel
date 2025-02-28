@@ -57,7 +57,7 @@ compilec:
 	$(CC) -g -shared -fpic -I${JAVA_HOME}/include -I${JAVA_HOME}/include/$(ARCH) src_jni/Daemon.c -o lib/libDaemon.$(EXT)
 
 nativeimage:
-	clojure -A:native-image
+	clojure -M:native-image
 
 # $(CC) -g -static -fpic -I${JAVA_HOME}/include -I${JAVA_HOME}/include/$(ARCH) src_jni/Daemon.c -o lib/libDaemon.$(EXT)
 # rm -f lib/libDaemon.a

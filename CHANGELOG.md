@@ -1,10 +1,8 @@
 # Unreleased
 
-## Added
-
 ## Fixed
 
-## Changed
+- Fix release process
 
 # 1.5.85 (2025-02-28 / 24334fc)
 

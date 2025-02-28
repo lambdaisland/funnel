@@ -33,7 +33,6 @@ jobs:
           tools-deps: ${{ env.CLOJURE_CLI_VERSION }}
       - name: Build native image
         run: |
-          gu install native-image
           make all
           ls -l ./funnel
       - name: Rename

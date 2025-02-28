@@ -52,6 +52,23 @@ this one-liner.
 clojure -Sdeps '{:deps {lambdaisland/funnel {:mvn/version "1.4.71"}}}' -m lambdaisland.funnel --help
 ```
 
+## Build 
+
+To build the native image yourself, make sure you are using GraalVMJava, and have the GNU compiler toolchain (gcc) available.
+
+With sdkman
+
+```
+sdk install java 25.ea.8-graal
+sdk use java 25.ea.8-graal
+```
+
+Then:
+
+```
+make all
+```
+
 ## Usage
 
 As an end user you are generally more interested in the tools that use Funnel

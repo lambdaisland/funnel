@@ -27,7 +27,7 @@
     (.close client))
   clojure.lang.IFn
   (invoke [this message]
-    (.send client ^String (funnel/to-transit message))))
+    (.send client ^String (funnel/encode :transit message))))
 
 (defmacro will
   "Variant of [[clojure.test/is]] that gives the predicate a bit of time to become

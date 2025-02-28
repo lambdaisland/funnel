@@ -20,21 +20,26 @@
     (with-open [s (test-server state)
                 c (test-client)]
       (c {:funnel/whoami {:id 123}})
-      (will (= [{:whoami {:id 123}}] (vals @state)))
+      (will (= [{:whoami {:id 123}
+                 :format :transit}] (vals @state)))
 
       (c {:funnel/whoami {:id :abc :hello :world}})
-      (will (= [{:whoami {:id :abc :hello :world}}] (vals @state)))
+      (will (= [{:whoami {:id :abc :hello :world}
+                 :format :transit}] (vals @state)))
 
       (with-open [c2 (test-client)]
         (c2 {:funnel/whoami {:root "/x/y/z"}})
 
         (will (match? (m/in-any-order [{:whoami {:id :abc
-                                                 :hello :world}}
-                                       {:whoami {:root "/x/y/z"}}])
+                                                 :hello :world}
+                                        :format :transit}
+                                       {:whoami {:root "/x/y/z"}
+                                        :format :transit}])
                       (vals @state))))
 
       (testing "closing will clean up the client connection"
-        (will (= [{:whoami {:id :abc :hello :world}}] (vals @state)))))))
+        (will (= [{:whoami {:id :abc :hello :world}
+                   :format :transit}] (vals @state)))))))
 
 (deftest subscribe-test
   (testing "messages get forwarded to subscriber"
@@ -47,7 +52,9 @@
              :funnel/subscribe [:id 2]})
         ;; Checkpoint to prevent race conditions, we only continue when funnel
         ;; has registered the subscription.
-        (will (= [{:whoami {:id 1}, :subscriptions #{[:id 2]}}]
+        (will (= [{:whoami {:id 1} :subscriptions #{[:id 2]} :format :transit}
+                  {:format :transit}
+                  {:format :transit}]
                  (vals @state)))
 
         (c2 {:funnel/whoami {:id 2}
@@ -67,9 +74,9 @@
     (with-open [s (test-server state)
                 c (test-client)]
       (c {:funnel/subscribe [:foo :bar]})
-      (will (= [{:subscriptions #{[:foo :bar]}}] (vals @state)))
+      (will (= [{:subscriptions #{[:foo :bar]} :format :transit}] (vals @state)))
       (c {:funnel/unsubscribe [:foo :bar]})
-      (will (= [{:subscriptions #{}}] (vals @state))))))
+      (will (= [{:subscriptions #{} :format :transit}] (vals @state))))))
 
 (deftest match-selector-test
   (testing "vector"
@@ -78,8 +85,10 @@
     (is (not (funnel/match-selector? {:id 123} [:id 456]))))
 
   (testing "true"
-    (is (funnel/match-selector? {:id 123} true))
-    (is (funnel/match-selector? nil true)))
+    (is (funnel/match-selector? {:id 123} true)))
+
+  (testing "no whoami"
+    (is (not (funnel/match-selector? nil true))))
 
   (testing "map"
     (is (funnel/match-selector? {:type :x :subtype :a} {:type :x}))
@@ -88,9 +97,12 @@
 
 (deftest destinations-test
   (let [state {:ws1 {:whoami {:id :ws1}
-                     :subscriptions #{[:id :ws2]}}
-               :ws2 {:whoami {:id :ws2}}
-               :ws3 {:whoami {:id :ws3}}}]
+                     :subscriptions #{[:id :ws2]}
+                     :format :transit}
+               :ws2 {:whoami {:id :ws2}
+                     :format :transit}
+               :ws3 {:whoami {:id :ws3}
+                     :format :transit}}]
 
     (is (= [:ws1] (funnel/destinations :ws2 nil state)))
     (is (match? (m/in-any-order [:ws1 :ws3])

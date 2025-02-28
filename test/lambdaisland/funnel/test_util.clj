@@ -1,12 +1,14 @@
 (ns lambdaisland.funnel.test-util
-  (:require [clojure.java.io :as io]
-            [clojure.test :as t]
-            [lambdaisland.funnel :as funnel]
-            [matcher-combinators.test]
-            [matcher-combinators.core :as mc])
-  (:import (java.net URI)
-           (java.net ServerSocket)
-           (org.java_websocket.client WebSocketClient)))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.test :as t]
+   [lambdaisland.funnel :as funnel]
+   [matcher-combinators.test]
+   [matcher-combinators.core :as mc])
+  (:import
+   (java.net URI)
+   (java.net ServerSocket)
+   (org.java_websocket.client WebSocketClient)))
 
 (def ^:dynamic *port* 0)
 

@@ -109,6 +109,7 @@
 
 (defn match-selector? [whoami selector]
   (cond
+    (nil? whoami)      false
     (true? selector)   true
     (vector? selector) (= (second selector) (get whoami (first selector)))
     (map? selector)    (reduce (fn [_ [k v]]
@@ -133,12 +134,12 @@
 
 (defn handle-query [conn selector conns]
   (let [msg {:funnel/clients
-             (map (comp :whoami val)
-                  (filter
-                   (fn [[c m]]
-                     (and (match-selector? (:whoami m) selector)
-                          (not= c conn)))
-                   conns))}]
+             (keep (comp :whoami val)
+                   (filter
+                    (fn [[c m]]
+                      (and (match-selector? (:whoami m) selector)
+                           (not= c conn)))
+                    conns))}]
     (async/>!! (outbox conn) msg)))
 
 (defn handle-message [state ^WebSocket conn raw-msg]
